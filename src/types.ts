@@ -4,6 +4,12 @@ export interface User {
   name: string;
   type: 'restaurant' | 'supplier' | 'admin';
   email?: string;
+  settings?: any;
+  subscription?: {
+    active: boolean;
+    plan: 'monthly' | 'yearly';
+    expiresAt: string;
+  };
 }
 
 export interface PriceRecord {

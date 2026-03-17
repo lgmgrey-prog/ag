@@ -142,21 +142,28 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onNotificationClic
                   </AnimatePresence>
                 </div>
 
-                <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
-                  <button 
-                    onClick={onOpenSettings}
-                    className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all"
-                    title="Настройки"
-                  >
-                    <Settings size={20} />
-                  </button>
-                  <button 
-                    onClick={onLogout}
-                    className="p-2 text-zinc-500 hover:text-red-600 hover:bg-white rounded-lg transition-all"
-                    title="Выйти"
-                  >
-                    <LogOut size={20} />
-                  </button>
+                <div className="flex items-center gap-4">
+                  <div className="hidden sm:block text-right">
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest leading-none mb-1">Добро пожаловать</p>
+                    <p className="text-sm font-bold text-zinc-900 leading-none">{user.name}</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
+                    <button 
+                      onClick={onOpenSettings}
+                      className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all"
+                      title="Настройки"
+                    >
+                      <Settings size={20} />
+                    </button>
+                    <button 
+                      onClick={onLogout}
+                      className="p-2 text-zinc-500 hover:text-red-600 hover:bg-white rounded-lg transition-all"
+                      title="Выйти"
+                    >
+                      <LogOut size={20} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -174,9 +181,12 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onNotificationClic
   );
 };
 
-const SettingsModal = ({ user, onClose, onUpdate }: { user: User; onClose: () => void; onUpdate: (u: User) => void }) => {
+// --- Settings View ---
+
+const SettingsView = ({ user, onUpdate, showToast }: { user: User, onUpdate: (u: User) => void, showToast: (m: string, t?: 'success' | 'error') => void }) => {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email || '');
+  const [settings, setSettings] = useState<any>(user.settings || {});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -188,55 +198,63 @@ const SettingsModal = ({ user, onClose, onUpdate }: { user: User; onClose: () =>
       const res = await fetch(`/api/users/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email })
+        body: JSON.stringify({ name, email, settings })
       });
       if (!res.ok) throw new Error('Ошибка при обновлении профиля');
       const updatedUser = await res.json();
       onUpdate(updatedUser);
-      onClose();
+      showToast('Настройки успешно сохранены', 'success');
     } catch (err: any) {
       setError(err.message);
+      showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
-      >
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-zinc-900 tracking-tight">Настройки профиля</h2>
-            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-900 transition-colors">
-              <X size={24} />
-            </button>
+    <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
+      <div className="p-8 border-b border-zinc-100 bg-zinc-50/50 flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-zinc-900 tracking-tight">Настройки профиля</h2>
+          <p className="text-zinc-500 text-sm">Укажите актуальные данные вашей организации</p>
+        </div>
+        {user.type === 'restaurant' && (
+          <div className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest border ${
+            user.subscription?.active 
+              ? 'bg-emerald-50 border-emerald-100 text-emerald-600' 
+              : 'bg-zinc-50 border-zinc-100 text-zinc-400'
+          }`}>
+            {user.subscription?.active 
+              ? `Подписка активна до ${new Date(user.subscription.expiresAt).toLocaleDateString()}` 
+              : 'Подписка не активна'}
           </div>
+        )}
+      </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="p-4 bg-red-50 text-red-600 text-sm font-bold rounded-2xl border border-red-100">
-                {error}
-              </div>
-            )}
+      <form onSubmit={handleSubmit} className="p-8 space-y-8">
+        {error && (
+          <div className="p-4 bg-red-50 text-red-600 text-sm font-bold rounded-2xl border border-red-100">
+            {error}
+          </div>
+        )}
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <h3 className="font-bold text-zinc-900 uppercase tracking-widest text-xs">Основная информация</h3>
             <div>
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Название / Имя</label>
+              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Название организации</label>
               <input 
                 type="text" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                placeholder="Напр. Ресторан 'Гурман'"
                 className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
                 required
               />
             </div>
-
             <div>
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Email</label>
+              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Email для уведомлений</label>
               <input 
                 type="email" 
                 value={email}
@@ -245,24 +263,117 @@ const SettingsModal = ({ user, onClose, onUpdate }: { user: User; onClose: () =>
                 placeholder="example@mail.com"
               />
             </div>
-
-            <div className="pt-2">
-              <button 
-                type="submit"
-                disabled={loading}
-                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 disabled:opacity-50"
-              >
-                {loading ? 'Сохранение...' : 'Сохранить изменения'}
-              </button>
+            <div>
+              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Контактный телефон</label>
+              <input 
+                type="tel" 
+                value={settings.phone || ''}
+                onChange={(e) => setSettings({...settings, phone: e.target.value})}
+                placeholder="+7 (___) ___-__-__"
+                className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+              />
             </div>
-          </form>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="font-bold text-zinc-900 uppercase tracking-widest text-xs">Детальные настройки</h3>
+            <div>
+              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Фактический адрес</label>
+              <textarea 
+                value={settings.address || ''}
+                onChange={(e) => setSettings({...settings, address: e.target.value})}
+                placeholder="Город, улица, дом, офис/этаж"
+                className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium h-32 resize-none"
+              />
+            </div>
+
+            {user.type === 'restaurant' ? (
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Желаемое время доставки</label>
+                <select 
+                  value={settings.preferredDeliveryTime || 'morning'}
+                  onChange={(e) => setSettings({...settings, preferredDeliveryTime: e.target.value})}
+                  className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                >
+                  <option value="morning">Утро (08:00 - 12:00)</option>
+                  <option value="afternoon">День (12:00 - 17:00)</option>
+                  <option value="evening">Вечер (17:00 - 21:00)</option>
+                </select>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Мин. сумма заказа (₽)</label>
+                  <input 
+                    type="number" 
+                    value={settings.minOrderAmount || ''}
+                    onChange={(e) => setSettings({...settings, minOrderAmount: e.target.value})}
+                    placeholder="5000"
+                    className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Регионы доставки</label>
+                  <input 
+                    type="text" 
+                    value={settings.deliveryRegions || ''}
+                    onChange={(e) => setSettings({...settings, deliveryRegions: e.target.value})}
+                    placeholder="Москва, МО, Санкт-Петербург"
+                    className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </motion.div>
+
+        <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
+          <h4 className="font-bold text-zinc-900 mb-4 flex items-center gap-2">
+            <Bell size={18} className="text-emerald-600" /> Уведомления
+          </h4>
+          <div className="space-y-4">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                checked={settings.notifications?.email ?? true}
+                onChange={(e) => setSettings({
+                  ...settings, 
+                  notifications: { ...(settings.notifications || {}), email: e.target.checked }
+                })}
+                className="w-5 h-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="text-sm font-medium text-zinc-700 group-hover:text-zinc-900 transition-colors">Получать уведомления на Email</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                checked={settings.notifications?.browser ?? true}
+                onChange={(e) => setSettings({
+                  ...settings, 
+                  notifications: { ...(settings.notifications || {}), browser: e.target.checked }
+                })}
+                className="w-5 h-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="text-sm font-medium text-zinc-700 group-hover:text-zinc-900 transition-colors">Браузерные уведомления</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="pt-8 border-t border-zinc-100 flex justify-end">
+          <button 
+            type="submit"
+            disabled={loading}
+            className="px-12 py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? <RefreshCw className="animate-spin" size={20} /> : 'Сохранить настройки'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
 
-const Landing = ({ onStart }: { onStart: () => void }) => (
+const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan: 'monthly' | 'yearly') => void }) => (
   <div className="bg-white">
     {/* Hero */}
     <section className="relative pt-20 pb-32 overflow-hidden">
@@ -388,8 +499,96 @@ const Landing = ({ onStart }: { onStart: () => void }) => (
         </div>
       </div>
     </section>
+
+    {/* Pricing */}
+    <section className="py-32 bg-zinc-50 overflow-hidden relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="text-center max-w-3xl mx-auto mb-20">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight text-zinc-900">Простые тарифы для роста</h2>
+          <p className="text-zinc-500 text-lg">Выберите подходящий план и начните экономить на закупках уже сегодня.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          {/* Monthly */}
+          <div className="bg-white border border-zinc-200 rounded-3xl p-8 hover:border-emerald-500/50 transition-all group shadow-sm">
+            <div className="mb-8">
+              <h3 className="text-xl font-bold mb-2 text-zinc-900">Месячный</h3>
+              <p className="text-zinc-500 text-sm">Идеально для небольших заведений</p>
+            </div>
+            <div className="mb-8">
+              <span className="text-5xl font-bold text-zinc-900">3 000 ₽</span>
+              <span className="text-zinc-500 ml-2">/ месяц</span>
+            </div>
+            <ul className="space-y-4 mb-10">
+              {["Все поставщики в одном окне", "AI-анализ товарной матрицы", "Уведомления об изменении цен", "Интеграция с 1С и iiko", "Чат с поддержкой 24/7"].map((item, i) => (
+                <li key={i} className="flex items-center gap-3 text-zinc-600 text-sm">
+                  <CheckCircle2 className="text-emerald-500" size={18} />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <button 
+              onClick={() => onPayment('monthly')}
+              className="w-full py-4 rounded-2xl bg-zinc-100 text-zinc-900 font-bold hover:bg-zinc-200 transition-all"
+            >
+              Выбрать тариф
+            </button>
+          </div>
+
+          {/* Yearly */}
+          <div className="bg-white border-2 border-emerald-500 rounded-3xl p-8 shadow-xl shadow-emerald-900/5 relative overflow-hidden group">
+            <div className="absolute top-4 right-4 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">Выгода 45%</div>
+            <div className="mb-8">
+              <h3 className="text-xl font-bold mb-2 text-zinc-900">Годовой</h3>
+              <p className="text-zinc-500 text-sm">Для тех, кто планирует надолго</p>
+            </div>
+            <div className="mb-8">
+              <span className="text-5xl font-bold text-zinc-900">20 000 ₽</span>
+              <span className="text-zinc-500 ml-2">/ год</span>
+            </div>
+            <ul className="space-y-4 mb-10">
+              {["Все поставщики в одном окне", "AI-анализ товарной матрицы", "Уведомления об изменении цен", "Интеграция с 1С и iiko", "Чат с поддержкой 24/7"].map((item, i) => (
+                <li key={i} className="flex items-center gap-3 text-zinc-600 text-sm">
+                  <CheckCircle2 className="text-emerald-500" size={18} />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <button 
+              onClick={() => onPayment('yearly')}
+              className="w-full py-4 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
+            >
+              Выбрать тариф
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Background glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-500/5 rounded-full blur-[120px] -z-0" />
+    </section>
   </div>
 );
+
+const ConfirmModal = ({ isOpen, title, message, onConfirm, onClose }: { isOpen: boolean, title: string, message: string, onConfirm: () => void, onClose: () => void }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl"
+      >
+        <h3 className="text-xl font-bold text-zinc-900 mb-2">{title}</h3>
+        <p className="text-zinc-500 mb-8">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 px-6 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-bold hover:bg-zinc-200 transition-all">Отмена</button>
+          <button onClick={() => { onConfirm(); onClose(); }} className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all">Удалить</button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 
 const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boolean, onClose: () => void, onUpload: () => void, userId: number }) => {
   const [amount, setAmount] = useState('');
@@ -1399,7 +1598,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'invoices' | 'integrations' | 'cart' | 'suppliers'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'invoices' | 'integrations' | 'cart' | 'suppliers' | 'settings'>('dashboard');
   const [selectedPrice, setSelectedPrice] = useState<PriceRecord | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
@@ -1451,10 +1650,40 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
     setCart(prev => prev.filter(item => !(item.product_name === productName && item.supplier_name === supplierName)));
   };
 
-  const handlePlaceOrder = () => {
-    alert('Заказ успешно оформлен! Поставщики уведомлены.');
-    setCart([]);
-    setActiveTab('dashboard');
+  const handlePlaceOrder = async () => {
+    if (cart.length === 0) return;
+
+    // Group items by supplier
+    const ordersBySupplier = cart.reduce((acc, item) => {
+      if (!acc[item.supplier_id]) acc[item.supplier_id] = [];
+      acc[item.supplier_id].push(item);
+      return acc;
+    }, {} as Record<number, CartItem[]>);
+
+    try {
+      for (const supplierId in ordersBySupplier) {
+        const items = ordersBySupplier[supplierId];
+        const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        
+        await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            restaurant_id: user.id,
+            supplier_id: parseInt(supplierId),
+            items,
+            total
+          })
+        });
+      }
+
+      showToast?.('Заказ успешно оформлен! Поставщики уведомлены.');
+      setCart([]);
+      setActiveTab('dashboard');
+    } catch (err) {
+      console.error(err);
+      showToast?.('Ошибка при оформлении заказа', 'error');
+    }
   };
 
   const handleAnalyze = async () => {
@@ -1475,43 +1704,42 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header & Tabs */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 mb-8">
-        <div>
-          <h1 className="text-4xl font-bold text-zinc-900 mb-1">Агрегатор</h1>
-          <p className="text-zinc-500">Управление закупками для <span className="text-zinc-900 font-semibold">{user.name}</span></p>
+      <div className="space-y-8">
+        {/* Top Navigation */}
+        <div className="bg-white border border-zinc-200 rounded-3xl p-4 shadow-sm">
+          <nav className="flex flex-wrap gap-2">
+            {[
+              { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
+              { id: 'suppliers', label: 'Поставщики', icon: Users },
+              { id: 'chat', label: 'Чат', icon: MessageSquare },
+              { id: 'invoices', label: 'Бухгалтерия', icon: FileText },
+              { id: 'cart', label: `Заказ (${cart.length})`, icon: ShoppingCart },
+              { id: 'integrations', label: 'Интеграции', icon: Zap },
+              { id: 'settings', label: 'Настройки', icon: Settings },
+            ].map((tab) => (
+              <button 
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  if (tab.id !== 'suppliers') setSelectedSupplierId(null);
+                }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  activeTab === tab.id 
+                    ? 'bg-zinc-900 text-white shadow-md' 
+                    : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
+                }`}
+              >
+                <tab.icon size={18} className={activeTab === tab.id ? 'text-emerald-400' : ''} />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
-        
-        <div className="flex bg-zinc-100 p-1.5 rounded-2xl w-full lg:w-auto">
-          {[
-            { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
-            { id: 'suppliers', label: 'Поставщики', icon: Users },
-            { id: 'chat', label: 'Чат', icon: MessageSquare },
-            { id: 'invoices', label: 'Бухгалтерия', icon: FileText },
-            { id: 'cart', label: `Заказ (${cart.length})`, icon: ShoppingCart },
-            { id: 'integrations', label: 'Интеграции', icon: Settings },
-          ].map((tab) => (
-            <button 
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id as any);
-                if (tab.id !== 'suppliers') setSelectedSupplierId(null);
-              }}
-              className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                activeTab === tab.id 
-                  ? 'bg-white text-emerald-600 shadow-sm' 
-                  : 'text-zinc-500 hover:text-zinc-700'
-              }`}
-            >
-              <tab.icon size={18} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <AnimatePresence mode="wait">
-        {activeTab === 'dashboard' && (
+        {/* Main Content Area */}
+        <div>
+          <AnimatePresence mode="wait">
+            {activeTab === 'dashboard' && (
           <motion.div 
             key="dashboard"
             initial={{ opacity: 0, y: 10 }}
@@ -1721,31 +1949,43 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
             )}
           </motion.div>
         )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {selectedPrice && (
-          <PriceDetailModal 
-            price={selectedPrice} 
-            onClose={() => setSelectedPrice(null)} 
-            onAddToCart={addToCart}
-            onWriteMessage={(supplierName) => {
-              // Find supplier ID by name
-              fetch('/api/suppliers')
-                .then(res => res.json())
-                .then(suppliers => {
-                  const s = suppliers.find((s: any) => s.name === supplierName);
-                  if (s) {
-                    setChatTargetId(s.id);
-                    setActiveTab('chat');
-                  }
-                });
-            }}
-          />
+        {activeTab === 'settings' && (
+          <motion.div
+            key="settings"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <SettingsView user={user} onUpdate={(u) => {}} showToast={showToast} />
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
-  );
+  </div>
+
+  <AnimatePresence>
+    {selectedPrice && (
+      <PriceDetailModal 
+        price={selectedPrice} 
+        onClose={() => setSelectedPrice(null)} 
+        onAddToCart={addToCart}
+        onWriteMessage={(supplierName) => {
+          // Find supplier ID by name
+          fetch('/api/suppliers')
+            .then(res => res.json())
+            .then(suppliers => {
+              const s = suppliers.find((s: any) => s.name === supplierName);
+              if (s) {
+                setChatTargetId(s.id);
+                setActiveTab('chat');
+              }
+            });
+        }}
+      />
+    )}
+  </AnimatePresence>
+</div>
+);
 };
 
 const AdminDashboard = ({ user }: { user: User }) => {
@@ -1756,6 +1996,8 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'invoices' | 'prices'>('users');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedPrice, setSelectedPrice] = useState<any>(null);
+
+  const [confirmData, setConfirmData] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
 
   const fetchData = () => {
     fetch('/api/admin/users').then(res => res.json()).then(setUsers);
@@ -1769,9 +2011,15 @@ const AdminDashboard = ({ user }: { user: User }) => {
   }, []);
 
   const deleteUser = async (id: number) => {
-    if (!confirm('Вы уверены, что хотите удалить пользователя?')) return;
-    await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
-    fetchData();
+    setConfirmData({
+      isOpen: true,
+      title: 'Удалить пользователя?',
+      message: 'Это действие нельзя будет отменить.',
+      onConfirm: async () => {
+        await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+        fetchData();
+      }
+    });
   };
 
   const updateInvoiceStatus = async (id: number, status: string) => {
@@ -1784,13 +2032,26 @@ const AdminDashboard = ({ user }: { user: User }) => {
   };
 
   const deletePrice = async (id: number) => {
-    if (!confirm('Удалить эту позицию из прайса?')) return;
-    await fetch(`/api/admin/prices/${id}`, { method: 'DELETE' });
-    fetchData();
+    setConfirmData({
+      isOpen: true,
+      title: 'Удалить позицию?',
+      message: 'Позиция будет удалена из общего прайс-листа.',
+      onConfirm: async () => {
+        await fetch(`/api/admin/prices/${id}`, { method: 'DELETE' });
+        fetchData();
+      }
+    });
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <ConfirmModal 
+        isOpen={!!confirmData?.isOpen}
+        title={confirmData?.title || ''}
+        message={confirmData?.message || ''}
+        onConfirm={confirmData?.onConfirm || (() => {})}
+        onClose={() => setConfirmData(null)}
+      />
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-zinc-900">Панель администратора</h1>
@@ -2014,6 +2275,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
             </div>
           </motion.div>
         )}
+
       </AnimatePresence>
 
       <AnimatePresence>
@@ -2051,16 +2313,37 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
   const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'Бакалея', unit: 'кг' });
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [stats, setStats] = useState({ productCount: 0, orderCount: 0, totalVolume: 0 });
 
-  const orders = [
-    { id: 'ORD-2024-001', restaurant: 'Вкус Востока', date: '2024-03-17', total: 12400, status: 'new', items: [
-      { name: 'Говядина вырезка', quantity: 10, unit: 'кг', price: 850 },
-      { name: 'Картофель', quantity: 50, unit: 'кг', price: 45 }
-    ]},
-    { id: 'ORD-2024-002', restaurant: 'Пицца Мастер', date: '2024-03-16', total: 5600, status: 'processing', items: [
-      { name: 'Мука в/с', quantity: 25, unit: 'кг', price: 65 }
-    ]}
-  ];
+  const fetchStats = () => {
+    fetch(`/api/supplier/${user.id}/stats`)
+      .then(res => res.json())
+      .then(setStats);
+  };
+
+  const fetchOrders = () => {
+    fetch(`/api/orders/supplier/${user.id}`)
+      .then(res => res.json())
+      .then(setOrders);
+  };
+
+  const updateOrderStatus = async (id: number, status: string) => {
+    try {
+      const res = await fetch(`/api/orders/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        showToast?.(`Статус заказа обновлен: ${status === 'processing' ? 'В работе' : 'Отклонен'}`);
+        fetchOrders();
+        setSelectedOrder(null);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     if (requestedTab) {
@@ -2080,6 +2363,7 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
       .then(res => res.json())
       .then(setIntegration);
     fetchPrices();
+    fetchOrders();
   }, [user.id]);
 
   const handleConnect1c = async (e: React.FormEvent) => {
@@ -2128,46 +2412,68 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
     }
   };
 
-  const deletePrice = async (id: number) => {
-    if (!confirm('Удалить этот товар из вашего прайс-листа?')) return;
-    await fetch(`/api/supplier/prices/${id}`, { method: 'DELETE' });
+  const [confirmData, setConfirmData] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
+
+  const fetchData = () => {
     fetchPrices();
+    fetchOrders();
+    fetchStats();
+  };
+
+  const deletePrice = async (id: number) => {
+    setConfirmData({
+      isOpen: true,
+      title: 'Удалить товар?',
+      message: 'Товар будет удален из вашего прайс-листа.',
+      onConfirm: async () => {
+        await fetch(`/api/supplier/prices/${id}`, { method: 'DELETE' });
+        fetchPrices();
+      }
+    });
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
-        <div>
-          <h1 className="text-3xl font-bold text-zinc-900">ЛК Поставщика</h1>
-          <p className="text-zinc-500">Управление прайсами, заказами и интеграциями для <span className="text-zinc-900 font-semibold">{user.name}</span></p>
+      <ConfirmModal 
+        isOpen={!!confirmData?.isOpen}
+        title={confirmData?.title || ''}
+        message={confirmData?.message || ''}
+        onConfirm={confirmData?.onConfirm || (() => {})}
+        onClose={() => setConfirmData(null)}
+      />
+      
+      <div className="space-y-8">
+        {/* Top Navigation */}
+        <div className="bg-white border border-zinc-200 rounded-3xl p-4 shadow-sm">
+          <nav className="flex flex-wrap gap-2">
+            {[
+              { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
+              { id: 'prices', label: 'Прайс-листы', icon: Package },
+              { id: 'chat', label: 'Чат', icon: MessageSquare },
+              { id: 'orders', label: 'Заказы', icon: FileText },
+              { id: 'integrations', label: 'Интеграция 1С', icon: Zap },
+              { id: 'settings', label: 'Настройки', icon: Settings },
+            ].map((tab) => (
+              <button 
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  activeTab === tab.id 
+                    ? 'bg-zinc-900 text-white shadow-md' 
+                    : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
+                }`}
+              >
+                <tab.icon size={18} className={activeTab === tab.id ? 'text-emerald-400' : ''} />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
-        
-        <div className="flex bg-zinc-100 p-1.5 rounded-2xl w-full lg:w-auto">
-          {[
-            { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
-            { id: 'prices', label: 'Прайс-листы', icon: Package },
-            { id: 'chat', label: 'Чат', icon: MessageSquare },
-            { id: 'orders', label: 'Заказы', icon: FileText },
-            { id: 'integrations', label: 'Интеграция 1С', icon: Zap },
-          ].map((tab) => (
-            <button 
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                activeTab === tab.id 
-                  ? 'bg-white text-emerald-600 shadow-sm' 
-                  : 'text-zinc-500 hover:text-zinc-700'
-              }`}
-            >
-              <tab.icon size={18} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <AnimatePresence mode="wait">
-        {activeTab === 'dashboard' && (
+        {/* Main Content Area */}
+        <div>
+          <AnimatePresence mode="wait">
+            {activeTab === 'dashboard' && (
           <motion.div 
             key="dashboard"
             initial={{ opacity: 0, y: 10 }}
@@ -2177,37 +2483,59 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="bg-white border border-zinc-200 rounded-3xl p-6">
-                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Активных заказов</p>
-                <p className="text-4xl font-bold text-zinc-900">12</p>
+                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Всего заказов</p>
+                <p className="text-4xl font-bold text-zinc-900">{stats.orderCount}</p>
               </div>
               <div className="bg-white border border-zinc-200 rounded-3xl p-6">
-                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Просмотров прайса</p>
-                <p className="text-4xl font-bold text-zinc-900">450</p>
+                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Товаров в прайсе</p>
+                <p className="text-4xl font-bold text-zinc-900">{stats.productCount}</p>
               </div>
               <div className="bg-zinc-900 text-white rounded-3xl p-6">
-                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Статус 1С</p>
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${integration ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-                  <p className="text-xl font-bold">{integration ? 'Подключено' : 'Не настроено'}</p>
-                </div>
+                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Объем продаж</p>
+                <p className="text-4xl font-bold text-emerald-400">{stats.totalVolume.toLocaleString()} ₽</p>
               </div>
             </div>
 
-            <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
-              <h2 className="text-xl font-bold text-zinc-900 mb-6">Последние уведомления</h2>
-              <div className="space-y-4">
-                <div 
-                  onClick={() => setActiveTab('orders')}
-                  className="flex items-center gap-4 p-4 bg-zinc-50 rounded-2xl cursor-pointer hover:bg-zinc-100 transition-colors"
-                >
-                  <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-                    <ShoppingCart size={20} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-zinc-900">Новый заказ от "Вкус Востока"</p>
-                    <p className="text-sm text-zinc-500">Сумма: 12 400 ₽ • 10 мин. назад</p>
+            <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h2 className="text-xl font-bold text-zinc-900 mb-6">Последние уведомления</h2>
+                <div className="space-y-4">
+                  <div 
+                    onClick={() => setActiveTab('orders')}
+                    className="flex items-center gap-4 p-4 bg-zinc-50 rounded-2xl cursor-pointer hover:bg-zinc-100 transition-colors"
+                  >
+                    <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                      <ShoppingCart size={20} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-zinc-900">Новые заказы</p>
+                      <p className="text-sm text-zinc-500">Проверьте вкладку заказов для обработки</p>
+                    </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="bg-zinc-900 text-white rounded-3xl p-8 flex flex-col justify-between">
+                <div>
+                  <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Статус интеграции 1С</p>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`w-3 h-3 rounded-full ${integration ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                    <p className="text-2xl font-bold">{integration ? 'Подключено' : 'Не настроено'}</p>
+                  </div>
+                  <p className="text-zinc-400 text-sm">
+                    {integration 
+                      ? `Последняя синхронизация: ${new Date(integration.last_sync).toLocaleString()}` 
+                      : 'Подключите 1С для автоматической выгрузки прайсов и заказов'}
+                  </p>
+                </div>
+                {!integration && (
+                  <button 
+                    onClick={() => setActiveTab('integrations')}
+                    className="mt-6 w-full bg-white text-zinc-900 py-3 rounded-xl font-bold hover:bg-zinc-100 transition-all"
+                  >
+                    Настроить подключение
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
@@ -2485,7 +2813,20 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
+
+        {activeTab === 'settings' && (
+              <motion.div
+                key="settings"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <SettingsView user={user} onUpdate={(u) => {}} showToast={showToast} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
 
       <AnimatePresence>
         {selectedOrder && (
@@ -2524,19 +2865,13 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
               </div>
               <div className="p-8 bg-zinc-50 flex gap-4">
                 <button 
-                  onClick={() => {
-                    showToast?.(`Заказ ${selectedOrder.id} принят в работу`);
-                    setSelectedOrder(null);
-                  }}
+                  onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}
                   className="flex-1 bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all"
                 >
                   Принять в работу
                 </button>
                 <button 
-                  onClick={() => {
-                    showToast?.(`Заказ ${selectedOrder.id} отклонен`, 'error');
-                    setSelectedOrder(null);
-                  }}
+                  onClick={() => updateOrderStatus(selectedOrder.id, 'rejected')}
                   className="flex-1 bg-white border border-zinc-200 text-zinc-900 py-4 rounded-2xl font-bold hover:bg-zinc-50 transition-all"
                 >
                   Отклонить
@@ -2550,7 +2885,7 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
   );
 };
 
-const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () => void, onAuth: (user: User) => void }) => {
+const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () => void, onAuth: (user: User, isNew?: boolean) => void }) => {
   const [inn, setInn] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -2563,7 +2898,7 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
     setError('');
     const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
     const body = mode === 'register' 
-      ? { inn, name: type === 'restaurant' ? "Ресторан 'Гурман'" : "Поставщик Опт", type, email }
+      ? { inn, name: type === 'restaurant' ? "Новый ресторан" : "Новый поставщик", type, email }
       : { inn, password };
 
     try {
@@ -2578,7 +2913,7 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
         throw new Error(data.error || `Server error: ${res.status}`);
       }
       
-      onAuth(data);
+      onAuth(data, mode === 'register');
       onClose();
     } catch (err: any) {
       console.error('Auth fetch error:', err);
@@ -2695,7 +3030,6 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [requestedTab, setRequestedTab] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -2714,9 +3048,12 @@ export default function App() {
     }
   }, []);
 
-  const handleAuth = (u: User) => {
+  const handleAuth = (u: User, isNew: boolean = false) => {
     setUser(u);
     localStorage.setItem('user', JSON.stringify(u));
+    if (isNew) {
+      setRequestedTab('settings');
+    }
   };
 
   const handleLogout = () => {
@@ -2729,13 +3066,36 @@ export default function App() {
     localStorage.setItem('user', JSON.stringify(u));
   };
 
+  const handlePayment = async (plan: 'monthly' | 'yearly') => {
+    if (!user) {
+      setIsAuthOpen(true);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/subscription/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, plan })
+      });
+      
+      if (!res.ok) throw new Error('Ошибка при оплате');
+      
+      const updatedUser = await res.json();
+      handleUpdateUser(updatedUser);
+      showToast('Подписка успешно оформлена!', 'success');
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white font-sans text-zinc-900 selection:bg-emerald-100 selection:text-emerald-900">
       <Navbar 
         user={user} 
         onLogout={handleLogout} 
         onOpenAuth={() => setIsAuthOpen(true)} 
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => setRequestedTab('settings')}
         onNotificationClick={(type) => {
           if (type === 'chat') setRequestedTab('chat');
           if (type === 'price_alert') setRequestedTab('prices');
@@ -2753,7 +3113,7 @@ export default function App() {
             <SupplierDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} />
           )
         ) : (
-          <Landing onStart={() => setIsAuthOpen(true)} />
+          <Landing onStart={() => setIsAuthOpen(true)} onPayment={handlePayment} />
         )}
       </main>
 
@@ -2772,16 +3132,6 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)} 
         onAuth={handleAuth} 
       />
-
-      <AnimatePresence>
-        {isSettingsOpen && user && (
-          <SettingsModal 
-            user={user} 
-            onClose={() => setIsSettingsOpen(false)} 
-            onUpdate={handleUpdateUser} 
-          />
-        )}
-      </AnimatePresence>
 
       {/* Footer */}
       <footer className="border-t border-zinc-100 py-12 bg-zinc-50">

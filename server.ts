@@ -19,7 +19,9 @@ db.exec(`
     name TEXT,
     type TEXT, -- 'restaurant' or 'supplier'
     email TEXT,
-    password TEXT
+    password TEXT,
+    settings TEXT, -- JSON string
+    subscription TEXT -- JSON string
   );
 
   CREATE TABLE IF NOT EXISTS products (
@@ -66,7 +68,26 @@ db.exec(`
     last_sync DATETIME,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER,
+    supplier_id INTEGER,
+    items TEXT, -- JSON string
+    total REAL,
+    status TEXT DEFAULT 'new',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(restaurant_id) REFERENCES users(id),
+    FOREIGN KEY(supplier_id) REFERENCES users(id)
+  );
 `);
+
+// Migration: Add settings column if it doesn't exist
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN subscription TEXT").run();
+} catch (e) {
+  // Column already exists
+}
 
 // Email Transporter Setup
 const transporter = nodemailer.createTransport({
@@ -111,18 +132,24 @@ async function startServer() {
   // Auth / Registration
   app.post("/api/auth/register", async (req, res) => {
     const { inn, name, type, email } = req.body;
+    
+    if (!inn || !name || !type || !email) {
+      return res.status(400).json({ error: "Все поля обязательны для заполнения" });
+    }
+
     const password = Math.random().toString(36).slice(-8); // Generate random 8-char password
     
     try {
-      const info = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(inn, name, type, email, password);
+      const info = db.prepare("INSERT INTO users (inn, name, type, email, password, settings) VALUES (?, ?, ?, ?, ?, ?)").run(inn, name, type, email, password, JSON.stringify({}));
       await sendWelcomeEmail(email, password);
-      res.json({ id: info.lastInsertRowid, inn, name, type, email });
+      res.json({ id: info.lastInsertRowid, inn, name, type, email, settings: {} });
     } catch (e) {
+      console.error("Registration error:", e);
       const user = db.prepare("SELECT * FROM users WHERE inn = ?").get(inn);
       if (user) {
         res.status(400).json({ error: "Пользователь с таким ИНН уже существует. Пожалуйста, войдите." });
       } else {
-        res.status(500).json({ error: "Ошибка регистрации" });
+        res.status(500).json({ error: `Ошибка регистрации: ${e.message}` });
       }
     }
   });
@@ -131,6 +158,12 @@ async function startServer() {
     const { inn, password } = req.body;
     const user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(inn, password);
     if (user) {
+      if (user.settings) {
+        user.settings = JSON.parse(user.settings);
+      }
+      if (user.subscription) {
+        user.subscription = JSON.parse(user.subscription);
+      }
       res.json(user);
     } else {
       res.status(401).json({ error: "Неверный ИНН или пароль" });
@@ -313,13 +346,52 @@ async function startServer() {
   // User Profile API
   app.patch("/api/users/:id", (req, res) => {
     const { id } = req.params;
-    const { name, email } = req.body;
+    const { name, email, settings, subscription } = req.body;
     try {
-      db.prepare("UPDATE users SET name = ?, email = ? WHERE id = ?").run(name, email, id);
-      const updatedUser = db.prepare("SELECT id, inn, name, type, email FROM users WHERE id = ?").get(id);
+      if (subscription) {
+        db.prepare("UPDATE users SET name = ?, email = ?, settings = ?, subscription = ? WHERE id = ?").run(name, email, JSON.stringify(settings), JSON.stringify(subscription), id);
+      } else {
+        db.prepare("UPDATE users SET name = ?, email = ?, settings = ? WHERE id = ?").run(name, email, JSON.stringify(settings), id);
+      }
+      const updatedUser = db.prepare("SELECT id, inn, name, type, email, settings, subscription FROM users WHERE id = ?").get(id);
+      if (updatedUser) {
+        if (updatedUser.settings) updatedUser.settings = JSON.parse(updatedUser.settings);
+        if (updatedUser.subscription) updatedUser.subscription = JSON.parse(updatedUser.subscription);
+      }
       res.json(updatedUser);
     } catch (err) {
       res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  // Payment / Subscription API
+  app.post("/api/subscription/pay", (req, res) => {
+    const { userId, plan } = req.body;
+    try {
+      const expiresAt = new Date();
+      if (plan === 'monthly') {
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+      } else {
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      }
+
+      const subscription = {
+        active: true,
+        plan,
+        expiresAt: expiresAt.toISOString()
+      };
+
+      db.prepare("UPDATE users SET subscription = ? WHERE id = ?").run(JSON.stringify(subscription), userId);
+      
+      const updatedUser = db.prepare("SELECT id, inn, name, type, email, settings, subscription FROM users WHERE id = ?").get(userId);
+      if (updatedUser) {
+        if (updatedUser.settings) updatedUser.settings = JSON.parse(updatedUser.settings);
+        if (updatedUser.subscription) updatedUser.subscription = JSON.parse(updatedUser.subscription);
+      }
+      
+      res.json(updatedUser);
+    } catch (err) {
+      res.status(500).json({ error: "Ошибка при обработке оплаты" });
     }
   });
 
@@ -496,8 +568,9 @@ async function startServer() {
       const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
       const invoiceCount = db.prepare("SELECT COUNT(*) as count FROM invoices").get().count;
       const messageCount = db.prepare("SELECT COUNT(*) as count FROM messages").get().count;
+      const orderCount = db.prepare("SELECT COUNT(*) as count FROM orders").get().count;
       const totalVolume = db.prepare("SELECT SUM(amount) as total FROM invoices").get().total || 0;
-      res.json({ userCount, invoiceCount, messageCount, totalVolume });
+      res.json({ userCount, invoiceCount, messageCount, orderCount, totalVolume });
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch stats" });
     }
@@ -688,6 +761,75 @@ async function startServer() {
       res.sendFile(path.join(__dirname, "dist", "index.html"));
     });
   }
+
+  // Orders API
+  app.post("/api/orders", (req, res) => {
+    const { restaurant_id, supplier_id, items, total } = req.body;
+    try {
+      const info = db.prepare(`
+        INSERT INTO orders (restaurant_id, supplier_id, items, total)
+        VALUES (?, ?, ?, ?)
+      `).run(restaurant_id, supplier_id, JSON.stringify(items), total);
+      res.json({ id: info.lastInsertRowid, success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to create order" });
+    }
+  });
+
+  app.get("/api/orders/supplier/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      const orders = db.prepare(`
+        SELECT o.*, u.name as restaurant
+        FROM orders o
+        JOIN users u ON o.restaurant_id = u.id
+        WHERE o.supplier_id = ?
+        ORDER BY o.created_at DESC
+      `).all(id);
+      res.json(orders.map(o => ({ ...o, items: JSON.parse(o.items) })));
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch supplier orders" });
+    }
+  });
+
+  app.get("/api/orders/restaurant/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      const orders = db.prepare(`
+        SELECT o.*, u.name as supplier
+        FROM orders o
+        JOIN users u ON o.supplier_id = u.id
+        WHERE o.restaurant_id = ?
+        ORDER BY o.created_at DESC
+      `).all(id);
+      res.json(orders.map(o => ({ ...o, items: JSON.parse(o.items) })));
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch restaurant orders" });
+    }
+  });
+
+  app.patch("/api/orders/:id/status", (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    try {
+      db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(status, id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update order status" });
+    }
+  });
+
+  app.get("/api/supplier/:id/stats", (req, res) => {
+    const { id } = req.params;
+    try {
+      const productCount = db.prepare("SELECT COUNT(*) as count FROM price_lists WHERE supplier_id = ?").get(id).count;
+      const orderCount = db.prepare("SELECT COUNT(*) as count FROM orders WHERE supplier_id = ?").get(id).count;
+      const totalVolume = db.prepare("SELECT SUM(total) as total FROM orders WHERE supplier_id = ?").get(id).total || 0;
+      res.json({ productCount, orderCount, totalVolume });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch supplier stats" });
+    }
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
