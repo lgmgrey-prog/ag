@@ -1,5 +1,3 @@
-import { GoogleGenAI, Modality } from "@google/genai";
-
 export interface User {
   id: number;
   inn: string;
