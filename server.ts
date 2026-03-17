@@ -100,7 +100,7 @@ async function sendWelcomeEmail(email: string, password: string) {
 
 async function startServer() {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
   const PORT = 3000;
 
   // API Routes

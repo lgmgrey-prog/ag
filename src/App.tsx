@@ -8,6 +8,7 @@ import {
   TrendingUp, 
   User as UserIcon, 
   Search, 
+  Send,
   Bell, 
   FileText, 
   Plus, 
@@ -29,19 +30,40 @@ import {
   ArrowLeft,
   Database,
   Link,
-  LogOut
+  LogOut,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
 import { analyzePrices } from './services/geminiService';
 
-// --- Components ---
+const Toast = ({ message, type = 'success', onClose }: { message: string, type?: 'success' | 'error', onClose: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
 
-const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings }: { 
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 50, x: '-50%' }}
+      animate={{ opacity: 1, y: 0, x: '-50%' }}
+      exit={{ opacity: 0, y: 50, x: '-50%' }}
+      className={`fixed bottom-8 left-1/2 z-[200] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border ${
+        type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-red-600 border-red-500 text-white'
+      }`}
+    >
+      {type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+      <p className="font-bold text-sm">{message}</p>
+    </motion.div>
+  );
+};
+
+const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onNotificationClick }: { 
   user: User | null, 
   onLogout: () => void, 
   onOpenAuth: () => void,
-  onOpenSettings: () => void
+  onOpenSettings: () => void,
+  onNotificationClick?: (type: string) => void
 }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -90,14 +112,20 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings }: {
                             </button>
                           </div>
                           <div className="max-h-96 overflow-y-auto p-2 space-y-1">
-                            <div className="flex gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100">
+                            <div 
+                              onClick={() => { onNotificationClick?.('price_alert'); setIsNotificationsOpen(false); }}
+                              className="flex gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors"
+                            >
                               <AlertCircle className="text-amber-600 shrink-0" size={18} />
                               <div>
                                 <p className="text-sm font-bold text-amber-900">Рост цен: Говядина</p>
                                 <p className="text-xs text-amber-700">Цена выросла на 12% у 'Мясной Двор'</p>
                               </div>
                             </div>
-                            <div className="flex gap-3 p-3 rounded-xl hover:bg-zinc-50 transition-colors cursor-pointer">
+                            <div 
+                              onClick={() => { onNotificationClick?.('chat'); setIsNotificationsOpen(false); }}
+                              className="flex gap-3 p-3 rounded-xl hover:bg-zinc-50 transition-colors cursor-pointer"
+                            >
                               <MessageSquare className="text-zinc-400 shrink-0" size={18} />
                               <div>
                                 <p className="text-sm font-bold text-zinc-900">Новое сообщение</p>
@@ -363,6 +391,106 @@ const Landing = ({ onStart }: { onStart: () => void }) => (
   </div>
 );
 
+const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boolean, onClose: () => void, onUpload: () => void, userId: number }) => {
+  const [amount, setAmount] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || !file) return;
+    setLoading(true);
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      try {
+        const res = await fetch('/api/invoices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            restaurant_id: userId,
+            supplier_id: 1,
+            amount: parseFloat(amount),
+            image_url: base64
+          })
+        });
+        if (res.ok) {
+          onUpload();
+          onClose();
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm" onClick={onClose} />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+      >
+        <div className="p-6 border-b border-zinc-100 flex justify-between items-center">
+          <h3 className="text-xl font-bold text-zinc-900">Загрузка накладной</h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+            <X size={24} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Сумма в накладной (₽)</label>
+            <input 
+              type="number" 
+              required
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="0.00"
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Файл (JPG, PNG, PDF)</label>
+            <div className="relative">
+              <input 
+                type="file" 
+                required
+                accept="image/*,.pdf"
+                onChange={e => setFile(e.target.files?.[0] || null)}
+                className="hidden"
+                id="invoice-file"
+              />
+              <label 
+                htmlFor="invoice-file"
+                className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-zinc-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer transition-all"
+              >
+                <Upload size={32} className={file ? 'text-emerald-500' : 'text-zinc-300'} />
+                <p className="mt-2 text-sm font-medium text-zinc-500">
+                  {file ? file.name : 'Нажмите для выбора файла'}
+                </p>
+              </label>
+            </div>
+          </div>
+          <button 
+            type="submit"
+            disabled={loading || !amount || !file}
+            className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
+          >
+            {loading ? 'Загрузка...' : 'Загрузить'}
+          </button>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
 const InvoiceDetailModal = ({ invoice, onClose }: { invoice: any, onClose: () => void }) => {
   if (!invoice) return null;
   
@@ -389,9 +517,20 @@ const InvoiceDetailModal = ({ invoice, onClose }: { invoice: any, onClose: () =>
         </div>
         
         <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="aspect-[3/4] bg-zinc-100 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-zinc-200">
-            <FileText size={64} className="text-zinc-300 mb-4" />
-            <p className="text-sm text-zinc-400 font-medium">Скан документа</p>
+          <div className="aspect-[3/4] bg-zinc-100 rounded-2xl overflow-hidden flex flex-col items-center justify-center border-2 border-dashed border-zinc-200">
+            {invoice.image_url ? (
+              <img 
+                src={invoice.image_url} 
+                alt="Скан накладной" 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <>
+                <FileText size={64} className="text-zinc-300 mb-4" />
+                <p className="text-sm text-zinc-400 font-medium">Скан документа</p>
+              </>
+            )}
           </div>
           
           <div className="space-y-6">
@@ -432,7 +571,12 @@ const InvoiceDetailModal = ({ invoice, onClose }: { invoice: any, onClose: () =>
   );
 };
 
-const PriceDetailModal = ({ price, onClose, onAddToCart }: { price: PriceRecord, onClose: () => void, onAddToCart?: (price: PriceRecord) => void }) => {
+const PriceDetailModal = ({ price, onClose, onAddToCart, onWriteMessage }: { 
+  price: PriceRecord, 
+  onClose: () => void, 
+  onAddToCart?: (price: PriceRecord) => void,
+  onWriteMessage?: (supplierName: string) => void
+}) => {
   if (!price) return null;
 
   return (
@@ -502,7 +646,13 @@ const PriceDetailModal = ({ price, onClose, onAddToCart }: { price: PriceRecord,
                   Добавить в заказ
                 </button>
               )}
-              <button className="w-14 h-14 bg-zinc-100 text-zinc-600 rounded-2xl flex items-center justify-center hover:bg-zinc-200 transition-all">
+              <button 
+                onClick={() => {
+                  if (onWriteMessage) onWriteMessage(price.supplier_name);
+                  onClose();
+                }}
+                className="w-14 h-14 bg-zinc-100 text-zinc-600 rounded-2xl flex items-center justify-center hover:bg-zinc-200 transition-all"
+              >
                 <MessageSquare size={24} />
               </button>
             </div>
@@ -513,11 +663,20 @@ const PriceDetailModal = ({ price, onClose, onAddToCart }: { price: PriceRecord,
   );
 };
 
-const ChatWindow = ({ user }: { user: User }) => {
+const ChatWindow = ({ user, targetContactId }: { user: User, targetContactId?: number | null }) => {
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
+
+  const formatMoscowTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('ru-RU', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      timeZone: 'Europe/Moscow' 
+    });
+  };
 
   useEffect(() => {
     fetch(`/api/conversations/${user.id}`)
@@ -525,14 +684,29 @@ const ChatWindow = ({ user }: { user: User }) => {
       .then(data => {
         if (Array.isArray(data)) {
           setConversations(data);
-          if (data.length > 0) {
+          if (targetContactId) {
+            const target = data.find(c => c.id === targetContactId);
+            if (target) {
+              setSelectedConv(target);
+            } else {
+              // If not in conversations yet, we might need to fetch the user info
+              fetch(`/api/admin/users`)
+                .then(res => res.json())
+                .then(users => {
+                  const userToChat = users.find((u: any) => u.id === targetContactId);
+                  if (userToChat) {
+                    setSelectedConv({ id: userToChat.id, name: userToChat.name });
+                  }
+                });
+            }
+          } else if (data.length > 0 && !selectedConv) {
             setSelectedConv(data[0]);
           }
         } else {
           setConversations([]);
         }
       });
-  }, [user.id]);
+  }, [user.id, targetContactId]);
 
   useEffect(() => {
     if (selectedConv) {
@@ -555,11 +729,23 @@ const ChatWindow = ({ user }: { user: User }) => {
     setInput('');
     
     // Update last message in conversations list
-    setConversations(prev => prev.map(c => 
-      c.id === selectedConv.id 
-        ? { ...c, last_message: input, last_message_time: new Date().toISOString() } 
-        : c
-    ));
+    setConversations(prev => {
+      const exists = prev.find(c => c.id === selectedConv.id);
+      if (exists) {
+        return prev.map(c => 
+          c.id === selectedConv.id 
+            ? { ...c, last_message: input, last_message_time: new Date().toISOString() } 
+            : c
+        ).sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
+      } else {
+        return [{
+          id: selectedConv.id,
+          name: selectedConv.name,
+          last_message: input,
+          last_message_time: new Date().toISOString()
+        }, ...prev];
+      }
+    });
   };
 
   return (
@@ -570,33 +756,49 @@ const ChatWindow = ({ user }: { user: User }) => {
           <h3 className="font-bold text-zinc-900">Сообщения</h3>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {conversations.length === 0 ? (
+          {conversations.length === 0 && !selectedConv ? (
             <div className="p-8 text-center">
               <p className="text-sm text-zinc-400">Нет активных диалогов</p>
             </div>
           ) : (
-            conversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => setSelectedConv(conv)}
-                className={`w-full p-4 flex gap-3 items-start hover:bg-white transition-all border-b border-zinc-100/50 ${
-                  selectedConv?.id === conv.id ? 'bg-white border-l-4 border-l-emerald-600' : ''
-                }`}
-              >
-                <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex-shrink-0 flex items-center justify-center text-emerald-600 font-bold text-lg">
-                  {conv.name[0]}
-                </div>
-                <div className="flex-1 text-left min-w-0">
-                  <div className="flex justify-between items-baseline mb-1">
-                    <p className="font-bold text-zinc-900 truncate">{conv.name}</p>
-                    <span className="text-[10px] text-zinc-400">
-                      {conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </span>
+            <>
+              {selectedConv && !conversations.find(c => c.id === selectedConv.id) && (
+                <button
+                  onClick={() => setSelectedConv(selectedConv)}
+                  className="w-full p-4 flex gap-3 items-start bg-white border-l-4 border-l-emerald-600 border-b border-zinc-100/50"
+                >
+                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex-shrink-0 flex items-center justify-center text-emerald-600 font-bold text-lg">
+                    {selectedConv.name[0]}
                   </div>
-                  <p className="text-xs text-zinc-500 truncate">{conv.last_message}</p>
-                </div>
-              </button>
-            ))
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="font-bold text-zinc-900 truncate">{selectedConv.name}</p>
+                    <p className="text-xs text-emerald-600 italic">Новый диалог</p>
+                  </div>
+                </button>
+              )}
+              {conversations.map((conv) => (
+                <button
+                  key={conv.id}
+                  onClick={() => setSelectedConv(conv)}
+                  className={`w-full p-4 flex gap-3 items-start hover:bg-white transition-all border-b border-zinc-100/50 ${
+                    selectedConv?.id === conv.id ? 'bg-white border-l-4 border-l-emerald-600' : ''
+                  }`}
+                >
+                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex-shrink-0 flex items-center justify-center text-emerald-600 font-bold text-lg">
+                    {conv.name[0]}
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="flex justify-between items-baseline mb-1">
+                      <p className="font-bold text-zinc-900 truncate">{conv.name}</p>
+                      <span className="text-[10px] text-zinc-400">
+                        {conv.last_message_time ? formatMoscowTime(conv.last_message_time) : ''}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 truncate">{conv.last_message}</p>
+                  </div>
+                </button>
+              ))}
+            </>
           )}
         </div>
       </div>
@@ -633,30 +835,33 @@ const ChatWindow = ({ user }: { user: User }) => {
                   }`}>
                     <p className="text-sm leading-relaxed">{m.content}</p>
                     <p className={`text-[10px] mt-2 ${m.sender_id === user.id ? 'text-emerald-100' : 'text-zinc-400'}`}>
-                      {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatMoscowTime(m.created_at)}
                     </p>
                   </div>
                 </div>
               ))}
             </div>
 
-            <form onSubmit={sendMessage} className="p-6 border-t border-zinc-100 flex gap-3 bg-white">
+            <form onSubmit={sendMessage} className="p-4 border-t border-zinc-100 flex gap-3">
               <input 
                 type="text" 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Напишите сообщение..." 
-                className="flex-1 px-6 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                placeholder="Введите сообщение..." 
+                className="flex-1 px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
               />
-              <button className="bg-emerald-600 text-white p-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
-                <ArrowRight size={20} />
+              <button 
+                type="submit"
+                className="bg-emerald-600 text-white p-3 rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+              >
+                <Send size={20} />
               </button>
             </form>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-zinc-400 flex-col gap-4">
-            <MessageSquare size={48} className="opacity-20" />
-            <p>Выберите диалог для начала общения</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-zinc-300 p-12 text-center">
+            <MessageSquare size={64} className="mb-4 opacity-20" />
+            <p className="font-medium">Выберите диалог, чтобы начать общение</p>
           </div>
         )}
       </div>
@@ -667,11 +872,16 @@ const ChatWindow = ({ user }: { user: User }) => {
 const InvoicesView = ({ user }: { user: User }) => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  useEffect(() => {
+  const fetchInvoices = () => {
     fetch(`/api/invoices/${user.id}`)
       .then(res => res.json())
       .then(setInvoices);
+  };
+
+  useEffect(() => {
+    fetchInvoices();
   }, [user.id]);
 
   return (
@@ -679,7 +889,10 @@ const InvoicesView = ({ user }: { user: User }) => {
       <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden">
         <div className="p-6 border-b border-zinc-100 flex justify-between items-center">
           <h2 className="font-bold text-zinc-900">Фото накладных и счета</h2>
-          <button className="bg-zinc-900 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2">
+          <button 
+            onClick={() => setIsUploadModalOpen(true)}
+            className="bg-zinc-900 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"
+          >
             <Plus size={18} /> Загрузить накладную
           </button>
         </div>
@@ -711,6 +924,17 @@ const InvoicesView = ({ user }: { user: User }) => {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {isUploadModalOpen && (
+          <UploadInvoiceModal 
+            isOpen={isUploadModalOpen} 
+            onClose={() => setIsUploadModalOpen(false)} 
+            onUpload={fetchInvoices}
+            userId={user.id}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {selectedInvoice && (
@@ -1061,7 +1285,12 @@ const SuppliersView = ({ onSelectSupplier }: { onSelectSupplier: (id: number) =>
   );
 };
 
-const SupplierProfileView = ({ supplierId, onBack, onAddToCart }: { supplierId: number, onBack: () => void, onAddToCart: (price: PriceRecord) => void }) => {
+const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }: { 
+  supplierId: number, 
+  onBack: () => void, 
+  onAddToCart: (price: PriceRecord) => void,
+  onWriteMessage: (supplierId: number) => void
+}) => {
   const [supplier, setSupplier] = useState<SupplierDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -1108,7 +1337,10 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart }: { supplierId: 
               </div>
             </div>
           </div>
-          <button className="bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200">
+          <button 
+            onClick={() => onWriteMessage(supplier.id)}
+            className="bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200"
+          >
             Написать сообщение
           </button>
         </div>
@@ -1158,7 +1390,12 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart }: { supplierId: 
   );
 };
 
-const RestaurantDashboard = ({ user }: { user: User }) => {
+const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast }: { 
+  user: User, 
+  requestedTab?: string | null, 
+  onTabHandled?: () => void,
+  showToast?: (m: string, t?: 'success' | 'error') => void 
+}) => {
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1166,6 +1403,14 @@ const RestaurantDashboard = ({ user }: { user: User }) => {
   const [selectedPrice, setSelectedPrice] = useState<PriceRecord | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
+  const [chatTargetId, setChatTargetId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (requestedTab) {
+      setActiveTab(requestedTab as any);
+      onTabHandled?.();
+    }
+  }, [requestedTab, onTabHandled]);
 
   useEffect(() => {
     fetch('/api/prices')
@@ -1189,6 +1434,7 @@ const RestaurantDashboard = ({ user }: { user: User }) => {
       }
       return [...prev, { ...price, quantity: 1 }];
     });
+    showToast?.(`Товар "${price.product_name}" добавлен в корзину`);
   };
 
   const updateCartQuantity = (productName: string, supplierName: string, delta: number) => {
@@ -1383,9 +1629,17 @@ const RestaurantDashboard = ({ user }: { user: User }) => {
                         <td className="px-8 py-5 font-bold text-zinc-900 text-lg">{p.price} ₽</td>
                         <td className="px-8 py-5 text-xs text-zinc-400">{new Date(p.updated_at).toLocaleDateString()}</td>
                         <td className="px-8 py-5 text-right">
-                          <button className="text-emerald-600 font-bold text-sm opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1 ml-auto">
-                            Подробнее <ChevronRight size={16} />
-                          </button>
+                          <div className="flex items-center justify-end gap-3">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); addToCart(p); }}
+                              className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1"
+                            >
+                              <Plus size={14} /> В заказ
+                            </button>
+                            <button className="text-zinc-400 hover:text-zinc-600 transition-all">
+                              <ChevronRight size={18} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1403,7 +1657,7 @@ const RestaurantDashboard = ({ user }: { user: User }) => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
           >
-            <ChatWindow user={user} />
+            <ChatWindow user={user} targetContactId={chatTargetId} />
           </motion.div>
         )}
 
@@ -1457,6 +1711,10 @@ const RestaurantDashboard = ({ user }: { user: User }) => {
                 supplierId={selectedSupplierId} 
                 onBack={() => setSelectedSupplierId(null)} 
                 onAddToCart={addToCart}
+                onWriteMessage={(id) => {
+                  setChatTargetId(id);
+                  setActiveTab('chat');
+                }}
               />
             ) : (
               <SuppliersView onSelectSupplier={setSelectedSupplierId} />
@@ -1471,6 +1729,18 @@ const RestaurantDashboard = ({ user }: { user: User }) => {
             price={selectedPrice} 
             onClose={() => setSelectedPrice(null)} 
             onAddToCart={addToCart}
+            onWriteMessage={(supplierName) => {
+              // Find supplier ID by name
+              fetch('/api/suppliers')
+                .then(res => res.json())
+                .then(suppliers => {
+                  const s = suppliers.find((s: any) => s.name === supplierName);
+                  if (s) {
+                    setChatTargetId(s.id);
+                    setActiveTab('chat');
+                  }
+                });
+            }}
           />
         )}
       </AnimatePresence>
@@ -1767,7 +2037,12 @@ const AdminDashboard = ({ user }: { user: User }) => {
   );
 };
 
-const SupplierDashboard = ({ user }: { user: User }) => {
+const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: { 
+  user: User, 
+  requestedTab?: string | null, 
+  onTabHandled?: () => void,
+  showToast?: (m: string, t?: 'success' | 'error') => void
+}) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat'>('dashboard');
   const [integration, setIntegration] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -1775,6 +2050,24 @@ const SupplierDashboard = ({ user }: { user: User }) => {
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'Бакалея', unit: 'кг' });
   const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+
+  const orders = [
+    { id: 'ORD-2024-001', restaurant: 'Вкус Востока', date: '2024-03-17', total: 12400, status: 'new', items: [
+      { name: 'Говядина вырезка', quantity: 10, unit: 'кг', price: 850 },
+      { name: 'Картофель', quantity: 50, unit: 'кг', price: 45 }
+    ]},
+    { id: 'ORD-2024-002', restaurant: 'Пицца Мастер', date: '2024-03-16', total: 5600, status: 'processing', items: [
+      { name: 'Мука в/с', quantity: 25, unit: 'кг', price: 65 }
+    ]}
+  ];
+
+  useEffect(() => {
+    if (requestedTab) {
+      setActiveTab(requestedTab as any);
+      onTabHandled?.();
+    }
+  }, [requestedTab, onTabHandled]);
 
   const fetchPrices = () => {
     fetch(`/api/supplier/${user.id}/prices`)
@@ -1817,8 +2110,8 @@ const SupplierDashboard = ({ user }: { user: User }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          supplierId: user.id,
-          productName: newProduct.name,
+          supplier_id: user.id,
+          product_name: newProduct.name,
           price: parseFloat(newProduct.price),
           category: newProduct.category,
           unit: newProduct.unit
@@ -1903,7 +2196,10 @@ const SupplierDashboard = ({ user }: { user: User }) => {
             <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
               <h2 className="text-xl font-bold text-zinc-900 mb-6">Последние уведомления</h2>
               <div className="space-y-4">
-                <div className="flex items-center gap-4 p-4 bg-zinc-50 rounded-2xl">
+                <div 
+                  onClick={() => setActiveTab('orders')}
+                  className="flex items-center gap-4 p-4 bg-zinc-50 rounded-2xl cursor-pointer hover:bg-zinc-100 transition-colors"
+                >
                   <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
                     <ShoppingCart size={20} />
                   </div>
@@ -2035,10 +2331,52 @@ const SupplierDashboard = ({ user }: { user: User }) => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm"
+            className="space-y-8"
           >
-            <h2 className="text-xl font-bold text-zinc-900 mb-6">Управление заказами</h2>
-            <p className="text-zinc-500">Здесь будут отображаться заказы от ресторанов.</p>
+            <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-zinc-100">
+                <h2 className="text-xl font-bold text-zinc-900">Управление заказами</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                      <th className="px-8 py-5">ID Заказа</th>
+                      <th className="px-8 py-5">Ресторан</th>
+                      <th className="px-8 py-5">Дата</th>
+                      <th className="px-8 py-5">Сумма</th>
+                      <th className="px-8 py-5">Статус</th>
+                      <th className="px-8 py-5">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {orders.map((order) => (
+                      <tr key={order.id} className="hover:bg-zinc-50 transition-colors">
+                        <td className="px-8 py-5 font-mono text-sm font-bold text-zinc-900">{order.id}</td>
+                        <td className="px-8 py-5 font-bold text-zinc-900">{order.restaurant}</td>
+                        <td className="px-8 py-5 text-sm text-zinc-500">{order.date}</td>
+                        <td className="px-8 py-5 font-bold text-zinc-900">{order.total.toLocaleString()} ₽</td>
+                        <td className="px-8 py-5">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            order.status === 'new' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'
+                          }`}>
+                            {order.status === 'new' ? 'Новый' : 'В работе'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5">
+                          <button 
+                            onClick={() => setSelectedOrder(order)}
+                            className="text-emerald-600 hover:text-emerald-800 font-bold text-sm"
+                          >
+                            Детали
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -2146,6 +2484,66 @@ const SupplierDashboard = ({ user }: { user: User }) => {
               )}
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedOrder && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl"
+            >
+              <div className="p-8 border-b border-zinc-100 flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-zinc-900">Заказ {selectedOrder.id}</h2>
+                  <p className="text-zinc-500">{selectedOrder.restaurant}</p>
+                </div>
+                <button onClick={() => setSelectedOrder(null)} className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8">
+                <div className="space-y-4 mb-8">
+                  {selectedOrder.items.map((item: any, i: number) => (
+                    <div key={i} className="flex justify-between items-center p-4 bg-zinc-50 rounded-2xl">
+                      <div>
+                        <p className="font-bold text-zinc-900">{item.name}</p>
+                        <p className="text-sm text-zinc-500">{item.quantity} {item.unit} x {item.price} ₽</p>
+                      </div>
+                      <p className="font-bold text-zinc-900">{item.quantity * item.price} ₽</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between items-center pt-6 border-t border-zinc-100">
+                  <p className="text-zinc-500 font-bold uppercase tracking-wider text-sm">Итого</p>
+                  <p className="text-3xl font-bold text-emerald-600">{selectedOrder.total.toLocaleString()} ₽</p>
+                </div>
+              </div>
+              <div className="p-8 bg-zinc-50 flex gap-4">
+                <button 
+                  onClick={() => {
+                    showToast?.(`Заказ ${selectedOrder.id} принят в работу`);
+                    setSelectedOrder(null);
+                  }}
+                  className="flex-1 bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all"
+                >
+                  Принять в работу
+                </button>
+                <button 
+                  onClick={() => {
+                    showToast?.(`Заказ ${selectedOrder.id} отклонен`, 'error');
+                    setSelectedOrder(null);
+                  }}
+                  className="flex-1 bg-white border border-zinc-200 text-zinc-900 py-4 rounded-2xl font-bold hover:bg-zinc-50 transition-all"
+                >
+                  Отклонить
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
@@ -2298,6 +2696,12 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [requestedTab, setRequestedTab] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -2332,21 +2736,36 @@ export default function App() {
         onLogout={handleLogout} 
         onOpenAuth={() => setIsAuthOpen(true)} 
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onNotificationClick={(type) => {
+          if (type === 'chat') setRequestedTab('chat');
+          if (type === 'price_alert') setRequestedTab('prices');
+          if (type === 'order') setRequestedTab('orders');
+        }}
       />
       
       <main>
         {user ? (
           user.type === 'restaurant' ? (
-            <RestaurantDashboard user={user} />
+            <RestaurantDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} />
           ) : user.type === 'admin' ? (
             <AdminDashboard user={user} />
           ) : (
-            <SupplierDashboard user={user} />
+            <SupplierDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} />
           )
         ) : (
           <Landing onStart={() => setIsAuthOpen(true)} />
         )}
       </main>
+
+      <AnimatePresence>
+        {toast && (
+          <Toast 
+            message={toast.message} 
+            type={toast.type} 
+            onClose={() => setToast(null)} 
+          />
+        )}
+      </AnimatePresence>
 
       <AuthModal 
         isOpen={isAuthOpen} 
