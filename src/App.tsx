@@ -28,7 +28,8 @@ import {
   Star,
   ArrowLeft,
   Database,
-  Link
+  Link,
+  LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
@@ -36,7 +37,12 @@ import { analyzePrices } from './services/geminiService';
 
 // --- Components ---
 
-const Navbar = ({ user, onLogout, onOpenAuth }: { user: User | null, onLogout: () => void, onOpenAuth: () => void }) => {
+const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings }: { 
+  user: User | null, 
+  onLogout: () => void, 
+  onOpenAuth: () => void,
+  onOpenSettings: () => void
+}) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   return (
@@ -108,16 +114,20 @@ const Navbar = ({ user, onLogout, onOpenAuth }: { user: User | null, onLogout: (
                   </AnimatePresence>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-sm font-semibold text-zinc-900">{user.name}</p>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wider">{user.type === 'restaurant' ? 'Ресторан' : 'Поставщик'}</p>
-                  </div>
+                <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
+                  <button 
+                    onClick={onOpenSettings}
+                    className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all"
+                    title="Настройки"
+                  >
+                    <Settings size={20} />
+                  </button>
                   <button 
                     onClick={onLogout}
-                    className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition-colors"
+                    className="p-2 text-zinc-500 hover:text-red-600 hover:bg-white rounded-lg transition-all"
+                    title="Выйти"
                   >
-                    <UserIcon size={20} className="text-zinc-600" />
+                    <LogOut size={20} />
                   </button>
                 </div>
               </div>
@@ -133,6 +143,94 @@ const Navbar = ({ user, onLogout, onOpenAuth }: { user: User | null, onLogout: (
         </div>
       </div>
     </nav>
+  );
+};
+
+const SettingsModal = ({ user, onClose, onUpdate }: { user: User; onClose: () => void; onUpdate: (u: User) => void }) => {
+  const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email || '');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email })
+      });
+      if (!res.ok) throw new Error('Ошибка при обновлении профиля');
+      const updatedUser = await res.json();
+      onUpdate(updatedUser);
+      onClose();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+      >
+        <div className="p-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-zinc-900 tracking-tight">Настройки профиля</h2>
+            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-900 transition-colors">
+              <X size={24} />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="p-4 bg-red-50 text-red-600 text-sm font-bold rounded-2xl border border-red-100">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Название / Имя</label>
+              <input 
+                type="text" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Email</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                placeholder="example@mail.com"
+              />
+            </div>
+
+            <div className="pt-2">
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 disabled:opacity-50"
+              >
+                {loading ? 'Сохранение...' : 'Сохранить изменения'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </motion.div>
+    </div>
   );
 };
 
@@ -1670,15 +1768,25 @@ const AdminDashboard = ({ user }: { user: User }) => {
 };
 
 const SupplierDashboard = ({ user }: { user: User }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat'>('dashboard');
   const [integration, setIntegration] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [config1c, setConfig1c] = useState({ serverUrl: '', login: '', password: '' });
+  const [prices, setPrices] = useState<PriceRecord[]>([]);
+  const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'Бакалея', unit: 'кг' });
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+
+  const fetchPrices = () => {
+    fetch(`/api/supplier/${user.id}/prices`)
+      .then(res => res.json())
+      .then(setPrices);
+  };
 
   useEffect(() => {
     fetch(`/api/integrations/${user.id}`)
       .then(res => res.json())
       .then(setIntegration);
+    fetchPrices();
   }, [user.id]);
 
   const handleConnect1c = async (e: React.FormEvent) => {
@@ -1701,18 +1809,51 @@ const SupplierDashboard = ({ user }: { user: User }) => {
     }
   };
 
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAddingProduct(true);
+    try {
+      const res = await fetch('/api/supplier/prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplierId: user.id,
+          productName: newProduct.name,
+          price: parseFloat(newProduct.price),
+          category: newProduct.category,
+          unit: newProduct.unit
+        })
+      });
+      if (res.ok) {
+        setNewProduct({ name: '', price: '', category: 'Бакалея', unit: 'кг' });
+        fetchPrices();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsAddingProduct(false);
+    }
+  };
+
+  const deletePrice = async (id: number) => {
+    if (!confirm('Удалить этот товар из вашего прайс-листа?')) return;
+    await fetch(`/api/supplier/prices/${id}`, { method: 'DELETE' });
+    fetchPrices();
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
         <div>
           <h1 className="text-3xl font-bold text-zinc-900">ЛК Поставщика</h1>
-          <p className="text-zinc-500">Управление прайсами, заказами и интеграциями</p>
+          <p className="text-zinc-500">Управление прайсами, заказами и интеграциями для <span className="text-zinc-900 font-semibold">{user.name}</span></p>
         </div>
         
         <div className="flex bg-zinc-100 p-1.5 rounded-2xl w-full lg:w-auto">
           {[
             { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
             { id: 'prices', label: 'Прайс-листы', icon: Package },
+            { id: 'chat', label: 'Чат', icon: MessageSquare },
             { id: 'orders', label: 'Заказы', icon: FileText },
             { id: 'integrations', label: 'Интеграция 1С', icon: Zap },
           ].map((tab) => (
@@ -1750,23 +1891,154 @@ const SupplierDashboard = ({ user }: { user: User }) => {
                 <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Просмотров прайса</p>
                 <p className="text-4xl font-bold text-zinc-900">450</p>
               </div>
-              <div className="bg-white border border-zinc-200 rounded-3xl p-6">
-                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Выручка (мес)</p>
-                <p className="text-4xl font-bold text-emerald-600">1.2M ₽</p>
+              <div className="bg-zinc-900 text-white rounded-3xl p-6">
+                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Статус 1С</p>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${integration ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                  <p className="text-xl font-bold">{integration ? 'Подключено' : 'Не настроено'}</p>
+                </div>
               </div>
             </div>
 
-            <div className="bg-white border border-zinc-200 rounded-3xl p-8 text-center">
-              <Package size={48} className="mx-auto text-zinc-200 mb-4" />
-              <h2 className="text-xl font-bold text-zinc-900 mb-2">Интеграция с системами учета</h2>
-              <p className="text-zinc-500 max-w-md mx-auto">Подключите вашу 1С или МойСклад для автоматического обновления остатков и цен.</p>
-              <button 
-                onClick={() => setActiveTab('integrations')}
-                className="mt-6 bg-zinc-100 text-zinc-900 px-6 py-3 rounded-xl font-bold hover:bg-zinc-200 transition-colors"
-              >
-                Настроить интеграцию
-              </button>
+            <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+              <h2 className="text-xl font-bold text-zinc-900 mb-6">Последние уведомления</h2>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-4 bg-zinc-50 rounded-2xl">
+                  <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                    <ShoppingCart size={20} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-zinc-900">Новый заказ от "Вкус Востока"</p>
+                    <p className="text-sm text-zinc-500">Сумма: 12 400 ₽ • 10 мин. назад</p>
+                  </div>
+                </div>
+              </div>
             </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'prices' && (
+          <motion.div 
+            key="prices"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
+            <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+              <h2 className="text-xl font-bold text-zinc-900 mb-6">Добавить товар в прайс</h2>
+              <form onSubmit={handleAddProduct} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="md:col-span-2">
+                  <input 
+                    type="text" 
+                    placeholder="Название товара" 
+                    value={newProduct.name}
+                    onChange={e => setNewProduct({...newProduct, name: e.target.value})}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <input 
+                    type="number" 
+                    placeholder="Цена (₽)" 
+                    value={newProduct.price}
+                    onChange={e => setNewProduct({...newProduct, price: e.target.value})}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <select 
+                    value={newProduct.category}
+                    onChange={e => setNewProduct({...newProduct, category: e.target.value})}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  >
+                    <option>Бакалея</option>
+                    <option>Овощи</option>
+                    <option>Мясо</option>
+                    <option>Молочные продукты</option>
+                    <option>Напитки</option>
+                  </select>
+                </div>
+                <button 
+                  type="submit"
+                  disabled={isAddingProduct}
+                  className="bg-zinc-900 text-white py-3 rounded-xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
+                >
+                  {isAddingProduct ? '...' : 'Добавить'}
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-zinc-100">
+                <h2 className="text-xl font-bold text-zinc-900">Ваш прайс-лист</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                      <th className="px-8 py-5">Товар</th>
+                      <th className="px-8 py-5">Категория</th>
+                      <th className="px-8 py-5">Цена</th>
+                      <th className="px-8 py-5">Ед. изм.</th>
+                      <th className="px-8 py-5">Обновлено</th>
+                      <th className="px-8 py-5">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {prices.length > 0 ? prices.map((p, i) => (
+                      <tr key={i} className="hover:bg-zinc-50 transition-colors">
+                        <td className="px-8 py-5 font-bold text-zinc-900">{p.product_name}</td>
+                        <td className="px-8 py-5 text-sm text-zinc-500">{p.category}</td>
+                        <td className="px-8 py-5 font-bold text-zinc-900">{p.price} ₽</td>
+                        <td className="px-8 py-5 text-zinc-500">{p.unit}</td>
+                        <td className="px-8 py-5 text-xs text-zinc-400">{new Date(p.updated_at).toLocaleDateString()}</td>
+                        <td className="px-8 py-5">
+                          <button 
+                            onClick={() => deletePrice(p.id)}
+                            className="text-red-500 hover:text-red-700 font-bold text-sm"
+                          >
+                            Удалить
+                          </button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={6} className="px-8 py-10 text-center text-zinc-400 font-medium">
+                          Ваш прайс-лист пуст. Добавьте товары выше.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'chat' && (
+          <motion.div 
+            key="chat"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <ChatWindow user={user} />
+          </motion.div>
+        )}
+
+        {activeTab === 'orders' && (
+          <motion.div 
+            key="orders"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm"
+          >
+            <h2 className="text-xl font-bold text-zinc-900 mb-6">Управление заказами</h2>
+            <p className="text-zinc-500">Здесь будут отображаться заказы от ресторанов.</p>
           </motion.div>
         )}
 
@@ -2025,13 +2297,41 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        localStorage.removeItem('user');
+      }
+    }
+  }, []);
+
+  const handleAuth = (u: User) => {
+    setUser(u);
+    localStorage.setItem('user', JSON.stringify(u));
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+  };
+
+  const handleUpdateUser = (u: User) => {
+    setUser(u);
+    localStorage.setItem('user', JSON.stringify(u));
+  };
 
   return (
     <div className="min-h-screen bg-white font-sans text-zinc-900 selection:bg-emerald-100 selection:text-emerald-900">
       <Navbar 
         user={user} 
-        onLogout={() => setUser(null)} 
+        onLogout={handleLogout} 
         onOpenAuth={() => setIsAuthOpen(true)} 
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
       
       <main>
@@ -2051,8 +2351,18 @@ export default function App() {
       <AuthModal 
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
-        onAuth={setUser} 
+        onAuth={handleAuth} 
       />
+
+      <AnimatePresence>
+        {isSettingsOpen && user && (
+          <SettingsModal 
+            user={user} 
+            onClose={() => setIsSettingsOpen(false)} 
+            onUpdate={handleUpdateUser} 
+          />
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <footer className="border-t border-zinc-100 py-12 bg-zinc-50">

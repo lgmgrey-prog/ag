@@ -310,6 +310,75 @@ async function startServer() {
     }
   }
 
+  // User Profile API
+  app.patch("/api/users/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, email } = req.body;
+    try {
+      db.prepare("UPDATE users SET name = ?, email = ? WHERE id = ?").run(name, email, id);
+      const updatedUser = db.prepare("SELECT id, inn, name, type, email FROM users WHERE id = ?").get(id);
+      res.json(updatedUser);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  // Supplier Product Management
+  app.get("/api/supplier/:id/prices", (req, res) => {
+    const { id } = req.params;
+    try {
+      const prices = db.prepare(`
+        SELECT pl.id, p.name as product_name, p.category, pl.price, p.unit, pl.updated_at, p.id as product_id
+        FROM price_lists pl
+        JOIN products p ON pl.product_id = p.id
+        WHERE pl.supplier_id = ?
+      `).all(id);
+      res.json(prices);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch supplier prices" });
+    }
+  });
+
+  app.post("/api/supplier/prices", (req, res) => {
+    const { supplier_id, product_name, category, price, unit } = req.body;
+    try {
+      // 1. Find or create product
+      let product = db.prepare("SELECT id FROM products WHERE name = ?").get(product_name);
+      let productId;
+      
+      if (!product) {
+        const info = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)").run(product_name, category, unit);
+        productId = info.lastInsertRowid;
+      } else {
+        productId = product.id;
+      }
+
+      // 2. Add or update price list
+      const existingPrice = db.prepare("SELECT id FROM price_lists WHERE supplier_id = ? AND product_id = ?").get(supplier_id, productId);
+      
+      if (existingPrice) {
+        db.prepare("UPDATE price_lists SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(price, existingPrice.id);
+        res.json({ success: true, message: "Price updated" });
+      } else {
+        db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(supplier_id, productId, price);
+        res.json({ success: true, message: "Product added to price list" });
+      }
+    } catch (err) {
+      console.error("Add price error:", err);
+      res.status(500).json({ error: "Failed to add product" });
+    }
+  });
+
+  app.delete("/api/supplier/prices/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare("DELETE FROM price_lists WHERE id = ?").run(id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to delete product from price list" });
+    }
+  });
+
   // Messaging API
   app.get("/api/conversations/:userId", (req, res) => {
     const { userId } = req.params;
