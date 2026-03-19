@@ -131,6 +131,76 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // Datanewton API Proxy
+  app.post("/api/datanewton/counterparty", async (req, res) => {
+    const { inn } = req.body;
+    const apiKey = process.env.DATANEWTON_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ error: "Datanewton API key not configured" });
+    }
+
+    if (!inn) {
+      return res.status(400).json({ error: "ИНН обязателен" });
+    }
+
+    try {
+      // Explicitly pass empty strings for optional params to avoid 409 Conflict error
+      const response = await axios.get("https://api.datanewton.ru/v1/counterparty", {
+        params: {
+          key: apiKey,
+          inn: String(inn),
+          ogrn: "",
+          filters: ""
+        }
+      });
+
+      const result = response.data;
+      console.log("Datanewton API Response for INN", inn, ":", JSON.stringify(result, null, 2));
+
+      // The API might return an object with company/individual or an empty object
+      if (!result || (!result.company && !result.individual)) {
+        return res.status(404).json({ error: "Организация не найдена" });
+      }
+
+      // Extract name from company or individual based on provided structure
+      let name = "Организация найдена";
+      
+      if (result.company) {
+        const c = result.company;
+        const names = c.company_names || c.name;
+        if (names) {
+          name = names.short || 
+                 names.full || 
+                 names.short_name || 
+                 names.full_name || 
+                 (typeof names === 'string' ? names : name);
+        }
+      } else if (result.individual) {
+        const i = result.individual;
+        // For individuals, the field is 'fio' according to the documentation provided
+        name = i.fio || 
+               i.name?.full || 
+               i.name?.short || 
+               i.full_name || 
+               i.short_name || 
+               (typeof i.name === 'string' ? i.name : name);
+      }
+
+      res.json({ ...result, name });
+    } catch (err: any) {
+      const errorData = err.response?.data;
+      const statusCode = err.response?.status;
+      console.error("Datanewton API error:", {
+        status: statusCode,
+        data: errorData,
+        message: err.message,
+        inn: inn
+      });
+      res.status(500).json({ error: "Ошибка при получении данных об организации" });
+    }
+  });
+
   // Auth / Registration
   app.post("/api/auth/register", async (req, res) => {
     const { inn, name, type, email } = req.body;

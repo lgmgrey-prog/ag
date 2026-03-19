@@ -2892,13 +2892,52 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
   const [type, setType] = useState<'restaurant' | 'supplier'>('restaurant');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [error, setError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [orgName, setOrgName] = useState('');
+  const [verificationStep, setVerificationStep] = useState<'input' | 'confirm' | 'form'>('input');
+
+  const handleVerifyINN = async () => {
+    if (inn.length < 10) {
+      setError('ИНН должен содержать 10 или 12 цифр');
+      return;
+    }
+    
+    setIsVerifying(true);
+    setError('');
+    
+    try {
+      const res = await fetch('/api/datanewton/counterparty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inn })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Ошибка при проверке ИНН');
+      }
+      
+      setOrgName(data.name || 'Организация найдена');
+      setVerificationStep('confirm');
+    } catch (err: any) {
+      setError(err.message || 'Не удалось найти организацию по этому ИНН');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (mode === 'register' && verificationStep === 'input') {
+      await handleVerifyINN();
+      return;
+    }
+
     const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
     const body = mode === 'register' 
-      ? { inn, name: type === 'restaurant' ? "Новый ресторан" : "Новый поставщик", type, email }
+      ? { inn, name: orgName, type, email }
       : { inn, password };
 
     try {
@@ -2939,7 +2978,9 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
         <p className="text-zinc-500 mb-8">
           {mode === 'login' 
             ? 'Введите ИНН и пароль для входа в систему' 
-            : 'Заполните данные для создания аккаунта. Пароль придет на почту.'}
+            : verificationStep === 'confirm' 
+              ? 'Пожалуйста, подтвердите вашу организацию'
+              : 'Заполните данные для создания аккаунта. Пароль придет на почту.'}
         </p>
         
         {error && (
@@ -2948,78 +2989,123 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {mode === 'register' && (
-            <div className="flex p-1 bg-zinc-100 rounded-xl">
+        {mode === 'register' && verificationStep === 'confirm' ? (
+          <div className="space-y-6">
+            <div className="p-6 bg-zinc-50 rounded-2xl border border-zinc-100">
+              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Ваша организация:</p>
+              <p className="text-lg font-bold text-zinc-900">{orgName}</p>
+              <p className="text-sm text-zinc-500 mt-1">ИНН: {inn}</p>
+            </div>
+            
+            <div className="flex flex-col gap-3">
               <button 
-                type="button"
-                onClick={() => setType('restaurant')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${type === 'restaurant' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
+                onClick={() => setVerificationStep('form')}
+                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
               >
-                Ресторан
+                Да, продолжить регистрацию
               </button>
               <button 
-                type="button"
-                onClick={() => setType('supplier')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${type === 'supplier' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
+                onClick={() => {
+                  setVerificationStep('input');
+                  setInn('');
+                }}
+                className="w-full bg-white border border-zinc-200 text-zinc-600 py-4 rounded-2xl font-bold hover:bg-zinc-50 transition-all"
               >
-                Поставщик
+                Нет, указать другой ИНН
               </button>
             </div>
-          )}
-          
-          <div>
-            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">ИНН Организации</label>
-            <input 
-              type="text" 
-              value={inn}
-              onChange={(e) => setInn(e.target.value)}
-              placeholder="10 или 12 цифр" 
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-              required
-            />
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {mode === 'register' && verificationStep === 'input' && (
+              <div className="flex p-1 bg-zinc-100 rounded-xl">
+                <button 
+                  type="button"
+                  onClick={() => setType('restaurant')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${type === 'restaurant' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
+                >
+                  Ресторан
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setType('supplier')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${type === 'supplier' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
+                >
+                  Поставщик
+                </button>
+              </div>
+            )}
+            
+            {verificationStep === 'input' || mode === 'login' ? (
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">ИНН Организации</label>
+                <input 
+                  type="text" 
+                  value={inn}
+                  onChange={(e) => setInn(e.target.value.replace(/\D/g, ''))}
+                  placeholder="10 или 12 цифр" 
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                  required
+                />
+              </div>
+            ) : (
+              <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Организация</p>
+                <p className="font-bold text-zinc-900">{orgName}</p>
+                <p className="text-xs text-zinc-500">ИНН: {inn}</p>
+              </div>
+            )}
 
-          {mode === 'register' ? (
-            <div>
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Email для пароля</label>
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@mail.com" 
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                required
-              />
-            </div>
-          ) : (
-            <div>
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Пароль</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••" 
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                required
-              />
-            </div>
-          )}
+            {mode === 'register' ? (
+              verificationStep === 'form' && (
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Email для пароля</label>
+                  <input 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="example@mail.com" 
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                    required
+                  />
+                </div>
+              )
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Пароль</label>
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••" 
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                  required
+                />
+              </div>
+            )}
 
-          <button className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
-            {mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
-          </button>
-
-          <div className="text-center">
             <button 
-              type="button"
-              onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-              className="text-sm text-emerald-600 font-bold hover:underline"
+              disabled={isVerifying}
+              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
             >
-              {mode === 'login' ? 'У меня нет аккаунта' : 'У меня уже есть аккаунт'}
+              {isVerifying ? 'Проверка...' : mode === 'login' ? 'Войти' : verificationStep === 'input' ? 'Продолжить' : 'Зарегистрироваться'}
             </button>
-          </div>
-        </form>
+
+            <div className="text-center">
+              <button 
+                type="button"
+                onClick={() => {
+                  setMode(mode === 'login' ? 'register' : 'login');
+                  setVerificationStep('input');
+                  setError('');
+                }}
+                className="text-sm text-emerald-600 font-bold hover:underline"
+              >
+                {mode === 'login' ? 'У меня нет аккаунта' : 'У меня уже есть аккаунт'}
+              </button>
+            </div>
+          </form>
+        )}
       </motion.div>
     </div>
   );
