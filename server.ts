@@ -82,12 +82,14 @@ db.exec(`
   );
 `);
 
-// Migration: Add settings column if it doesn't exist
+// Migration: Add columns if they don't exist
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN settings TEXT").run();
+} catch (e) {}
+
 try {
   db.prepare("ALTER TABLE users ADD COLUMN subscription TEXT").run();
-} catch (e) {
-  // Column already exists
-}
+} catch (e) {}
 
 // Email Transporter Setup
 const transporter = nodemailer.createTransport({
