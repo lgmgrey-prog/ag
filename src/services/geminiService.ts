@@ -78,3 +78,70 @@ export async function analyzePrices(matrix: any[], marketPrices: any[]) {
     return { recommendations: [], alerts: ["Ошибка API Gemini"] };
   }
 }
+
+export async function recognizeInvoice(base64Image: string) {
+  // @ts-ignore
+  const apiKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || 
+                 // @ts-ignore
+                 (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || 
+                 "";
+
+  if (!apiKey) {
+    console.warn("Gemini API key is not set. Returning mock recognition.");
+    return {
+      amount: 12500,
+      supplier: "ООО Мясной Двор",
+      items: [
+        { name: "Говядина вырезка", quantity: 10, unit: "кг", price: 950, total: 9500 },
+        { name: "Свинина шея", quantity: 5, unit: "кг", price: 600, total: 3000 }
+      ]
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        {
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: base64Image.split(',')[1]
+          }
+        },
+        {
+          text: "Extract data from this invoice. Return JSON with 'amount' (total sum), 'supplier' (name), and 'items' (array of {name, quantity, unit, price, total})."
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            amount: { type: Type.NUMBER },
+            supplier: { type: Type.STRING },
+            items: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  quantity: { type: Type.NUMBER },
+                  unit: { type: Type.STRING },
+                  price: { type: Type.NUMBER },
+                  total: { type: Type.NUMBER }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error("Gemini API error:", error);
+    return { amount: 0, supplier: "", items: [] };
+  }
+}

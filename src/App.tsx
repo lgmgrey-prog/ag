@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
-import { analyzePrices } from './services/geminiService';
+import { analyzePrices, recognizeInvoice } from './services/geminiService';
 
 const Toast = ({ message, type = 'success', onClose }: { message: string, type?: 'success' | 'error', onClose: () => void }) => {
   useEffect(() => {
@@ -598,6 +598,27 @@ const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boo
   const [amount, setAmount] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isRecognizing, setIsRecognizing] = useState(false);
+
+  const handleAIRecognize = async () => {
+    if (!file) return;
+    setIsRecognizing(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      try {
+        const result = await recognizeInvoice(base64);
+        if (result && result.amount) {
+          setAmount(result.amount.toString());
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsRecognizing(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -680,6 +701,17 @@ const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boo
                 </p>
               </label>
             </div>
+            {file && (
+              <button
+                type="button"
+                onClick={handleAIRecognize}
+                disabled={isRecognizing}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all disabled:opacity-50"
+              >
+                {isRecognizing ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+                {isRecognizing ? 'Распознавание...' : 'Распознать сумму через AI'}
+              </button>
+            )}
           </div>
           <button 
             type="submit"
@@ -2384,6 +2416,18 @@ const UserDetailView = ({ user, onBack, onUpdate }: { user: any, onBack: () => v
           </div>
         </div>
         <div className="flex space-x-3">
+          {user.type !== 'admin' && (
+            <button 
+              onClick={() => {
+                if (window.confirm('Вы уверены, что хотите удалить этого пользователя? Это действие нельзя отменить.')) {
+                  fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' }).then(() => onBack());
+                }
+              }}
+              className="px-6 py-2 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 transition-all"
+            >
+              Удалить
+            </button>
+          )}
           <button 
             onClick={onBack}
             className="px-6 py-2 rounded-xl text-sm font-bold text-zinc-500 hover:bg-zinc-100 transition-all"
@@ -2545,14 +2589,23 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [selectedPrice, setSelectedPrice] = useState<any>(null);
   const [selectedUserForSub, setSelectedUserForSub] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [confirmData, setConfirmData] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
 
   const fetchData = () => {
-    fetch('/api/admin/users').then(res => res.json()).then(setUsers);
-    fetch('/api/admin/stats').then(res => res.json()).then(setStats);
-    fetch('/api/admin/invoices').then(res => res.json()).then(setInvoices);
-    fetch('/api/admin/prices').then(res => res.json()).then(setPrices);
+    setIsLoading(true);
+    Promise.all([
+      fetch('/api/admin/users').then(res => res.json()),
+      fetch('/api/admin/stats').then(res => res.json()),
+      fetch('/api/admin/invoices').then(res => res.json()),
+      fetch('/api/admin/prices').then(res => res.json())
+    ]).then(([usersData, statsData, invoicesData, pricesData]) => {
+      setUsers(usersData);
+      setStats(statsData);
+      setInvoices(invoicesData);
+      setPrices(pricesData);
+    }).finally(() => setIsLoading(false));
   };
 
   useEffect(() => {
@@ -2672,8 +2725,9 @@ const AdminDashboard = ({ user }: { user: User }) => {
               />
             ) : (
               <>
-                <div className="p-6 border-b border-zinc-100">
+                <div className="p-6 border-b border-zinc-100 flex justify-between items-center">
                   <h2 className="text-xl font-bold text-zinc-900">Управление пользователями</h2>
+                  {isLoading && <RefreshCw size={20} className="animate-spin text-zinc-400" />}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -2683,9 +2737,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
                         <th className="px-8 py-5">ИНН</th>
                         <th className="px-8 py-5">Название</th>
                         <th className="px-8 py-5">Тип</th>
-                        <th className="px-8 py-5">Email</th>
                         <th className="px-8 py-5">Подписка</th>
-                        <th className="px-8 py-5">Действия</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
@@ -2704,7 +2756,6 @@ const AdminDashboard = ({ user }: { user: User }) => {
                                 {u.type === 'admin' ? 'Админ' : u.type === 'restaurant' ? 'Ресторан' : 'Поставщик'}
                               </span>
                             </td>
-                            <td className="px-8 py-5 text-zinc-500">{u.email || '-'}</td>
                             <td className="px-8 py-5">
                               {u.type === 'restaurant' ? (
                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded border ${
@@ -2715,24 +2766,6 @@ const AdminDashboard = ({ user }: { user: User }) => {
                                   {sub?.status === 'active' ? (sub.plan === 'monthly' ? 'Месяц' : sub.plan === 'yearly' ? 'Год' : 'Пробный') : 'Нет'}
                                 </span>
                               ) : '-'}
-                            </td>
-                            <td className="px-8 py-5">
-                              <div className="flex items-center space-x-4">
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); setSelectedUser(u); }}
-                                  className="text-zinc-900 hover:text-zinc-600 font-bold text-sm"
-                                >
-                                  Управление
-                                </button>
-                                {u.type !== 'admin' && (
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
-                                    className="text-red-500 hover:text-red-700 font-bold text-sm"
-                                  >
-                                    Удалить
-                                  </button>
-                                )}
-                              </div>
                             </td>
                           </tr>
                         );
