@@ -104,7 +104,7 @@ db.exec(`
   );
 
   INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url)
-  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', 'https://ais-dev-7tmxg5o6b6xmc5shz4ehag-497192293449.europe-west2.run.app');
+  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', process.env.APP_URL);
 `);
 
 // Helper to get system settings
@@ -120,7 +120,7 @@ function getSystemSettings() {
     smtp_port: settings?.smtp_port || parseInt(process.env.SMTP_PORT || "587"),
     smtp_user: settings?.smtp_user || process.env.SMTP_USER || "",
     smtp_pass: settings?.smtp_pass || process.env.SMTP_PASS || "",
-    base_url: settings?.base_url || process.env.APP_URL || "https://ais-dev-7tmxg5o6b6xmc5shz4ehag-497192293449.europe-west2.run.app"
+    base_url: settings?.base_url || process.env.APP_URL || ""
   };
 }
 

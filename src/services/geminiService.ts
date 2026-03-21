@@ -6,10 +6,14 @@ const apiKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) |
                (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || 
                "";
 
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-
 export async function analyzePrices(matrix: any[], marketPrices: any[]) {
-  if (!ai) {
+  // @ts-ignore
+  const apiKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || 
+                 // @ts-ignore
+                 (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || 
+                 "";
+
+  if (!apiKey) {
     console.warn("Gemini API key is not set. Returning mock analysis.");
     return {
       recommendations: [
@@ -25,6 +29,7 @@ export async function analyzePrices(matrix: any[], marketPrices: any[]) {
     };
   }
 
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `
     Analyze the following restaurant product matrix and current market prices.
     Identify the top 3 saving opportunities where the restaurant can switch to a cheaper supplier.
