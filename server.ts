@@ -1058,24 +1058,6 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
-  const isProd = process.env.NODE_ENV === "production";
-  
-  if (!isProd) {
-    console.log("Starting in DEVELOPMENT mode with Vite middleware");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    console.log("Starting in PRODUCTION mode");
-    app.use(express.static(path.join(__dirname, "dist")));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
-    });
-  }
-
   // Orders API
   app.post("/api/orders", (req, res) => {
     const { restaurant_id, supplier_id, items, total } = req.body;
@@ -1144,6 +1126,23 @@ async function startServer() {
       res.status(500).json({ error: "Failed to fetch supplier stats" });
     }
   });
+
+  // Vite middleware for development (MUST BE AT THE END)
+  const isProd = process.env.NODE_ENV === "production";
+  if (!isProd) {
+    console.log("Starting in DEVELOPMENT mode with Vite middleware");
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    console.log("Starting in PRODUCTION mode");
+    app.use(express.static(path.join(__dirname, "dist")));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(__dirname, "dist", "index.html"));
+    });
+  }
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
