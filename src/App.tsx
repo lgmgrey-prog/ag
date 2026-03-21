@@ -31,7 +31,11 @@ import {
   Database,
   Link,
   LogOut,
-  Upload
+  Upload,
+  Lock,
+  CreditCard,
+  Mail,
+  Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
@@ -1589,11 +1593,12 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }
   );
 };
 
-const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast }: { 
+const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPayment }: { 
   user: User, 
   requestedTab?: string | null, 
   onTabHandled?: () => void,
-  showToast?: (m: string, t?: 'success' | 'error') => void 
+  showToast?: (m: string, t?: 'success' | 'error') => void,
+  onPayment: (plan: 'monthly' | 'yearly') => void
 }) => {
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -1842,8 +1847,8 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                       <th className="px-8 py-5"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {prices.map((p, i) => (
+                  <tbody className="divide-y divide-zinc-100 relative">
+                    {prices.slice(0, user.subscription?.active ? undefined : 3).map((p, i) => (
                       <tr 
                         key={i} 
                         onClick={() => setSelectedPrice(p)}
@@ -1871,6 +1876,42 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                         </td>
                       </tr>
                     ))}
+                    {!user.subscription?.active && prices.length > 3 && (
+                      <>
+                        {/* Blurred rows */}
+                        {[1, 2, 3].map((_, i) => (
+                          <tr key={`blur-${i}`} className="blur-[2px] opacity-30 select-none pointer-events-none">
+                            <td className="px-8 py-5 font-bold text-zinc-900">Скрытый товар</td>
+                            <td className="px-8 py-5"><span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">Категория</span></td>
+                            <td className="px-8 py-5 text-sm text-zinc-700 font-medium">Поставщик</td>
+                            <td className="px-8 py-5 font-bold text-zinc-900 text-lg">000 ₽</td>
+                            <td className="px-8 py-5 text-xs text-zinc-400">00.00.0000</td>
+                            <td className="px-8 py-5"></td>
+                          </tr>
+                        ))}
+                        {/* Overlay CTA */}
+                        <tr className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-white via-white/90 to-transparent flex items-center justify-center z-10">
+                          <td colSpan={6} className="text-center pb-12">
+                            <div className="bg-white p-8 rounded-3xl shadow-2xl border border-zinc-100 max-w-md mx-auto">
+                              <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <Lock className="text-emerald-600" size={32} />
+                              </div>
+                              <h3 className="text-xl font-bold text-zinc-900 mb-2">Полный доступ ограничен</h3>
+                              <p className="text-zinc-500 mb-6">
+                                В бесплатной версии доступно сравнение только 3 товаров. 
+                                Оплатите подписку, чтобы видеть все цены и экономить по-настоящему.
+                              </p>
+                              <button 
+                                onClick={() => onPayment('monthly')}
+                                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                              >
+                                Активировать подписку
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      </>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1988,14 +2029,329 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
 );
 };
 
+const SystemSettingsView = () => {
+  const [settings, setSettings] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then(res => res.json())
+      .then(setSettings);
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      });
+      if (res.ok) {
+        setMessage({ text: 'Настройки успешно сохранены', type: 'success' });
+      } else {
+        setMessage({ text: 'Ошибка при сохранении настроек', type: 'error' });
+      }
+    } catch (err) {
+      setMessage({ text: 'Ошибка сети', type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!settings) return <div className="p-8 text-center text-zinc-500">Загрузка настроек...</div>;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-4xl mx-auto space-y-8"
+    >
+      <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center text-zinc-900">
+            <Settings size={24} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-zinc-900">Системные настройки</h2>
+            <p className="text-zinc-500">Управление API ключами и учетными данными</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-8">
+          {/* General Settings */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+              <Link size={20} className="text-blue-500" />
+              Общие настройки
+            </h3>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Base URL (Домен сайта)</label>
+              <input 
+                type="text" 
+                value={settings.base_url}
+                onChange={e => setSettings({...settings, base_url: e.target.value})}
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                placeholder="https://your-domain.com"
+              />
+              <p className="text-[10px] text-zinc-400">Этот URL используется для формирования ссылок возврата Robokassa и других системных уведомлений.</p>
+            </div>
+          </div>
+
+          <div className="h-px bg-zinc-100" />
+
+          {/* Robokassa Settings */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+              <CreditCard size={20} className="text-emerald-500" />
+              Robokassa
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Merchant Login</label>
+                <input 
+                  type="text" 
+                  value={settings.robokassa_login}
+                  onChange={e => setSettings({...settings, robokassa_login: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Test Mode</label>
+                <div className="flex items-center h-[50px]">
+                  <button 
+                    type="button"
+                    onClick={() => setSettings({...settings, robokassa_test: !settings.robokassa_test})}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${settings.robokassa_test ? 'bg-emerald-500' : 'bg-zinc-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.robokassa_test ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                  <span className="ml-3 text-sm font-medium text-zinc-700">{settings.robokassa_test ? 'Включен' : 'Выключен'}</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Password 1</label>
+                <input 
+                  type="password" 
+                  value={settings.robokassa_pass1}
+                  onChange={e => setSettings({...settings, robokassa_pass1: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Password 2</label>
+                <input 
+                  type="password" 
+                  value={settings.robokassa_pass2}
+                  onChange={e => setSettings({...settings, robokassa_pass2: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+            
+            <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-3">
+              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Настройки для личного кабинета Robokassa:</p>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase">Result URL (POST):</p>
+                  <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/api/payments/robokassa/result</code>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase">Success URL (GET):</p>
+                  <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/</code>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase">Fail URL (GET):</p>
+                  <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/</code>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-px bg-zinc-100" />
+
+          {/* Datanewton Settings */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+              <Zap size={20} className="text-amber-500" />
+              Datanewton API
+            </h3>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">API Key</label>
+              <input 
+                type="password" 
+                value={settings.datanewton_api_key}
+                onChange={e => setSettings({...settings, datanewton_api_key: e.target.value})}
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                placeholder="Введите ваш API ключ Datanewton"
+              />
+            </div>
+          </div>
+
+          <div className="h-px bg-zinc-100" />
+
+          {/* SMTP Settings */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+              <Mail size={20} className="text-blue-500" />
+              SMTP (Email)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Host</label>
+                <input 
+                  type="text" 
+                  value={settings.smtp_host}
+                  onChange={e => setSettings({...settings, smtp_host: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  placeholder="smtp.example.com"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Port</label>
+                <input 
+                  type="number" 
+                  value={settings.smtp_port}
+                  onChange={e => setSettings({...settings, smtp_port: parseInt(e.target.value)})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  placeholder="587"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">User</label>
+                <input 
+                  type="text" 
+                  value={settings.smtp_user}
+                  onChange={e => setSettings({...settings, smtp_user: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  placeholder="user@example.com"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Password</label>
+                <input 
+                  type="password" 
+                  value={settings.smtp_pass}
+                  onChange={e => setSettings({...settings, smtp_pass: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+          </div>
+
+          {message && (
+            <div className={`p-4 rounded-2xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+              {message.text}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4">
+            <button 
+              type="submit"
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 shadow-lg"
+            >
+              {isSaving ? <RefreshCw size={20} className="animate-spin" /> : <Save size={20} />}
+              Сохранить настройки
+            </button>
+          </div>
+        </form>
+      </div>
+    </motion.div>
+  );
+};
+
+const SubscriptionModal = ({ user, onClose, onUpdate }: { user: any, onClose: () => void, onUpdate: () => void }) => {
+  const sub = typeof user.subscription === 'string' ? JSON.parse(user.subscription) : user.subscription;
+  const [plan, setPlan] = useState(sub?.plan || 'none');
+  const [expiresAt, setExpiresAt] = useState(sub?.expiresAt || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const subscription = plan === 'none' ? null : { plan, expiresAt, status: 'active' };
+      await fetch(`/api/admin/users/${user.id}/subscription`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription })
+      });
+      onUpdate();
+      onClose();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+      >
+        <div className="p-6 border-b border-zinc-100 flex justify-between items-center">
+          <h3 className="text-xl font-bold text-zinc-900">Управление подпиской</h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+            <X size={24} />
+          </button>
+        </div>
+        <div className="p-8 space-y-6">
+          <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 mb-4">
+            <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Пользователь</p>
+            <p className="font-bold text-zinc-900">{user.name}</p>
+            <p className="text-xs text-zinc-500">{user.inn}</p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Тарифный план</label>
+            <select 
+              value={plan}
+              onChange={(e) => setPlan(e.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            >
+              <option value="none">Нет подписки</option>
+              <option value="monthly">Месячный (3 000 ₽)</option>
+              <option value="yearly">Годовой (20 000 ₽)</option>
+              <option value="trial">Пробный период</option>
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Дата окончания</label>
+            <input 
+              type="date" 
+              value={expiresAt ? expiresAt.split('T')[0] : ''}
+              onChange={(e) => setExpiresAt(new Date(e.target.value).toISOString())}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            />
+          </div>
+          <button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
+          >
+            {isSaving ? 'Сохранение...' : 'Сохранить изменения'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const AdminDashboard = ({ user }: { user: User }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [prices, setPrices] = useState<any[]>([]);
-  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'invoices' | 'prices'>('users');
+  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'invoices' | 'prices' | 'settings'>('users');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedPrice, setSelectedPrice] = useState<any>(null);
+  const [selectedUserForSub, setSelectedUserForSub] = useState<any>(null);
 
   const [confirmData, setConfirmData] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
 
@@ -2076,6 +2432,12 @@ const AdminDashboard = ({ user }: { user: User }) => {
           >
             Прайс-листы
           </button>
+          <button 
+            onClick={() => setActiveAdminTab('settings')}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'settings' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
+          >
+            Настройки
+          </button>
         </div>
       </div>
       
@@ -2121,36 +2483,54 @@ const AdminDashboard = ({ user }: { user: User }) => {
                     <th className="px-8 py-5">Название</th>
                     <th className="px-8 py-5">Тип</th>
                     <th className="px-8 py-5">Email</th>
+                    <th className="px-8 py-5">Подписка</th>
                     <th className="px-8 py-5">Действия</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {users.map((u, i) => (
-                    <tr key={i} className="hover:bg-zinc-50 transition-colors">
-                      <td className="px-8 py-5 text-zinc-500">#{u.id}</td>
-                      <td className="px-8 py-5 font-bold text-zinc-900">{u.inn}</td>
-                      <td className="px-8 py-5 font-medium text-zinc-700">{u.name}</td>
-                      <td className="px-8 py-5">
-                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
-                          u.type === 'admin' ? 'bg-purple-50 text-purple-600' : 
-                          u.type === 'restaurant' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
-                        }`}>
-                          {u.type === 'admin' ? 'Админ' : u.type === 'restaurant' ? 'Ресторан' : 'Поставщик'}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-zinc-500">{u.email || '-'}</td>
-                      <td className="px-8 py-5">
-                        {u.type !== 'admin' && (
-                          <button 
-                            onClick={() => deleteUser(u.id)}
-                            className="text-red-500 hover:text-red-700 font-bold text-sm"
-                          >
-                            Удалить
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {users.map((u, i) => {
+                    const sub = typeof u.subscription === 'string' ? JSON.parse(u.subscription) : u.subscription;
+                    return (
+                      <tr key={i} className="hover:bg-zinc-50 transition-colors">
+                        <td className="px-8 py-5 text-zinc-500">#{u.id}</td>
+                        <td className="px-8 py-5 font-bold text-zinc-900">{u.inn}</td>
+                        <td className="px-8 py-5 font-medium text-zinc-700">{u.name}</td>
+                        <td className="px-8 py-5">
+                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
+                            u.type === 'admin' ? 'bg-purple-50 text-purple-600' : 
+                            u.type === 'restaurant' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
+                          }`}>
+                            {u.type === 'admin' ? 'Админ' : u.type === 'restaurant' ? 'Ресторан' : 'Поставщик'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5 text-zinc-500">{u.email || '-'}</td>
+                        <td className="px-8 py-5">
+                          {u.type === 'restaurant' ? (
+                            <button 
+                              onClick={() => setSelectedUserForSub(u)}
+                              className={`text-[10px] font-bold uppercase px-2 py-1 rounded border transition-all ${
+                                sub?.status === 'active' 
+                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' 
+                                  : 'bg-zinc-50 text-zinc-400 border-zinc-200 hover:bg-zinc-100'
+                              }`}
+                            >
+                              {sub?.status === 'active' ? (sub.plan === 'monthly' ? 'Месяц' : sub.plan === 'yearly' ? 'Год' : 'Пробный') : 'Нет'}
+                            </button>
+                          ) : '-'}
+                        </td>
+                        <td className="px-8 py-5">
+                          {u.type !== 'admin' && (
+                            <button 
+                              onClick={() => deleteUser(u.id)}
+                              className="text-red-500 hover:text-red-700 font-bold text-sm"
+                            >
+                              Удалить
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2276,6 +2656,10 @@ const AdminDashboard = ({ user }: { user: User }) => {
           </motion.div>
         )}
 
+        {activeAdminTab === 'settings' && (
+          <SystemSettingsView />
+        )}
+
       </AnimatePresence>
 
       <AnimatePresence>
@@ -2292,6 +2676,16 @@ const AdminDashboard = ({ user }: { user: User }) => {
           <PriceDetailModal 
             price={selectedPrice} 
             onClose={() => setSelectedPrice(null)} 
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedUserForSub && (
+          <SubscriptionModal 
+            user={selectedUserForSub}
+            onClose={() => setSelectedUserForSub(null)}
+            onUpdate={fetchData}
           />
         )}
       </AnimatePresence>
@@ -3159,17 +3553,20 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/subscription/pay', {
+      const res = await fetch('/api/payments/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, plan })
       });
       
-      if (!res.ok) throw new Error('Ошибка при оплате');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка при создании платежа');
       
-      const updatedUser = await res.json();
-      handleUpdateUser(updatedUser);
-      showToast('Подписка успешно оформлена!', 'success');
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('Не удалось получить ссылку на оплату');
+      }
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -3192,7 +3589,7 @@ export default function App() {
       <main>
         {user ? (
           user.type === 'restaurant' ? (
-            <RestaurantDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} />
+            <RestaurantDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} onPayment={handlePayment} />
           ) : user.type === 'admin' ? (
             <AdminDashboard user={user} />
           ) : (

@@ -6,11 +6,18 @@ import path from "path";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import axios from "axios";
+import crypto from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const db = new Database("procurehub.db");
+
+// Robokassa Config
+const ROBOKASSA_LOGIN = process.env.ROBOKASSA_LOGIN || "test_merchant";
+const ROBOKASSA_PASS1 = process.env.ROBOKASSA_PASS1 || "pass1";
+const ROBOKASSA_PASS2 = process.env.ROBOKASSA_PASS2 || "pass2";
+const IS_TEST = process.env.ROBOKASSA_TEST === "true";
 
 // Initialize database
 db.exec(`
@@ -81,11 +88,106 @@ db.exec(`
     FOREIGN KEY(restaurant_id) REFERENCES users(id),
     FOREIGN KEY(supplier_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS system_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    robokassa_login TEXT,
+    robokassa_pass1 TEXT,
+    robokassa_pass2 TEXT,
+    robokassa_test BOOLEAN,
+    datanewton_api_key TEXT,
+    smtp_host TEXT,
+    smtp_port INTEGER,
+    smtp_user TEXT,
+    smtp_pass TEXT,
+    base_url TEXT
+  );
+
+  INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url)
+  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', 'https://ais-dev-7tmxg5o6b6xmc5shz4ehag-497192293449.europe-west2.run.app');
 `);
+
+// Helper to get system settings
+function getSystemSettings() {
+  const settings = db.prepare("SELECT * FROM system_settings WHERE id = 1").get() as any;
+  return {
+    robokassa_login: settings?.robokassa_login || process.env.ROBOKASSA_LOGIN || "test_merchant",
+    robokassa_pass1: settings?.robokassa_pass1 || process.env.ROBOKASSA_PASS1 || "pass1",
+    robokassa_pass2: settings?.robokassa_pass2 || process.env.ROBOKASSA_PASS2 || "pass2",
+    robokassa_test: settings?.robokassa_test !== undefined ? Boolean(settings.robokassa_test) : process.env.ROBOKASSA_TEST === "true",
+    datanewton_api_key: settings?.datanewton_api_key || process.env.DATANEWTON_API_KEY || "",
+    smtp_host: settings?.smtp_host || process.env.SMTP_HOST || "",
+    smtp_port: settings?.smtp_port || parseInt(process.env.SMTP_PORT || "587"),
+    smtp_user: settings?.smtp_user || process.env.SMTP_USER || "",
+    smtp_pass: settings?.smtp_pass || process.env.SMTP_PASS || "",
+    base_url: settings?.base_url || process.env.APP_URL || "https://ais-dev-7tmxg5o6b6xmc5shz4ehag-497192293449.europe-west2.run.app"
+  };
+}
+
+function seedDatabase() {
+  // Clear tables
+  db.exec(`
+    DELETE FROM users;
+    DELETE FROM products;
+    DELETE FROM price_lists;
+    DELETE FROM messages;
+    DELETE FROM invoices;
+    DELETE FROM integrations;
+    DELETE FROM orders;
+  `);
+
+  // Reset autoincrement
+  db.exec(`
+    DELETE FROM sqlite_sequence WHERE name IN ('users', 'products', 'price_lists', 'messages', 'invoices', 'integrations', 'orders');
+  `);
+
+  // Insert Admin
+  db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '0000000000', 'Admin', 'admin', 'lgm.grey@gmail.com', 'admin'
+  );
+
+  // Insert Restaurant
+  db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '1234567890', 'Ресторан "Вкусный"', 'restaurant', 'rest@example.com', 'password'
+  );
+
+  // Insert Suppliers
+  const s1 = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '1111111111', 'Поставщик Овощей', 'supplier', 'sup1@example.com', 'password'
+  );
+  const s2 = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '2222222222', 'Мясной Двор', 'supplier', 'sup2@example.com', 'password'
+  );
+  const s3 = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '3333333333', 'Молочная Ферма', 'supplier', 'sup3@example.com', 'password'
+  );
+
+  // Insert Products
+  const p1 = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)").run('Помидоры', 'Овощи', 'кг');
+  const p2 = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)").run('Огурцы', 'Овощи', 'кг');
+  const p3 = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)").run('Говядина', 'Мясо', 'кг');
+  const p4 = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)").run('Курица', 'Мясо', 'кг');
+  const p5 = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)").run('Молоко', 'Молочные продукты', 'л');
+
+  // Insert Price Lists
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s1.lastInsertRowid, p1.lastInsertRowid, 150);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s1.lastInsertRowid, p2.lastInsertRowid, 120);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s2.lastInsertRowid, p3.lastInsertRowid, 550);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s2.lastInsertRowid, p4.lastInsertRowid, 280);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s3.lastInsertRowid, p5.lastInsertRowid, 85);
+  
+  console.log("Database seeded successfully");
+}
+
+// Check if we need to seed
+const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+if (userCount <= 1) {
+  seedDatabase();
+}
 
 // Migration: Add columns if they don't exist
 try {
-  db.prepare("ALTER TABLE users ADD COLUMN settings TEXT").run();
+  db.prepare("ALTER TABLE system_settings ADD COLUMN base_url TEXT").run();
 } catch (e) {}
 
 try {
@@ -93,38 +195,105 @@ try {
 } catch (e) {}
 
 // Email Transporter Setup
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.SMTP_PORT || "587"),
-  secure: process.env.SMTP_SECURE === "true",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+// Transporter is created dynamically in sendWelcomeEmail using system settings
 
 async function sendWelcomeEmail(email: string, password: string) {
-  if (!process.env.SMTP_USER) {
+  const settings = getSystemSettings();
+  if (!settings.smtp_user) {
     console.log("SMTP not configured. Password for", email, "is:", password);
     return;
   }
 
   try {
+    const transporter = nodemailer.createTransport({
+      host: settings.smtp_host,
+      port: settings.smtp_port,
+      secure: settings.smtp_port === 465,
+      auth: {
+        user: settings.smtp_user,
+        pass: settings.smtp_pass,
+      },
+    });
+
     await transporter.sendMail({
-      from: '"ProcureHub HoReCa" <noreply@procurehub.ru>',
+      from: `"ProcureHub HoReCa" <${settings.smtp_user}>`,
       to: email,
       subject: "Ваш пароль для ProcureHub",
-      text: `Добро пожаловать в ProcureHub! Ваш временный пароль для входа: ${password}`,
-      html: `<p>Добро пожаловать в <b>ProcureHub</b>!</p><p>Ваш временный пароль для входа: <b>${password}</b></p>`,
+      text: `Добро пожаловать в ProcureHub! Ваш временный пароль для входа: ${password}\n\nВход в систему: ${settings.base_url}`,
+      html: `<p>Добро пожаловать в <b>ProcureHub</b>!</p><p>Ваш временный пароль для входа: <b>${password}</b></p><p><a href="${settings.base_url}">Войти в систему</a></p>`,
     });
   } catch (error) {
     console.error("Failed to send email:", error);
   }
 }
 
+// Robokassa Payment URL Generator
+function generateRobokassaUrl(invId: number, outSum: number, description: string, email: string) {
+  const settings = getSystemSettings();
+  const signature = crypto
+    .createHash("md5")
+    .update(`${settings.robokassa_login}:${outSum}:${invId}:${settings.robokassa_pass1}`)
+    .digest("hex");
+
+  const baseUrl = "https://auth.robokassa.ru/Merchant/Index.aspx";
+
+  const params = new URLSearchParams({
+    MerchantLogin: settings.robokassa_login,
+    OutSum: outSum.toString(),
+    InvId: invId.toString(),
+    Description: description,
+    SignatureValue: signature,
+    Email: email,
+    IsTest: settings.robokassa_test ? "1" : "0"
+  });
+
+  return `${baseUrl}?${params.toString()}`;
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '10mb' }));
+
+  // Robokassa Result URL (Server-to-Server)
+  app.post("/api/payments/robokassa/result", (req, res) => {
+    const { OutSum, InvId, SignatureValue } = req.body;
+    const settings = getSystemSettings();
+
+    const mySignature = crypto
+      .createHash("md5")
+      .update(`${OutSum}:${InvId}:${settings.robokassa_pass2}`)
+      .digest("hex")
+      .toUpperCase();
+
+    if (SignatureValue?.toUpperCase() === mySignature) {
+      const userId = parseInt(InvId);
+      const expiresAt = new Date();
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
+
+      const subscription = JSON.stringify({
+        active: true,
+        plan: 'monthly',
+        expiresAt: expiresAt.toISOString()
+      });
+
+      db.prepare("UPDATE users SET subscription = ? WHERE id = ?").run(subscription, userId);
+      res.send(`OK${InvId}`);
+    } else {
+      res.status(400).send("bad signature");
+    }
+  });
+
+  app.post("/api/payments/create", (req, res) => {
+    const { userId, plan } = req.body;
+    const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const amount = plan === 'yearly' ? 20000 : 3000;
+    const description = `Подписка RestCost: ${plan === 'yearly' ? 'Годовая' : 'Месячная'}`;
+    const url = generateRobokassaUrl(user.id, amount, description, user.email || "");
+    res.json({ url });
+  });
+
   const PORT = 3000;
 
   // API Routes
@@ -135,9 +304,9 @@ async function startServer() {
   // Datanewton API Proxy
   app.post("/api/datanewton/counterparty", async (req, res) => {
     const { inn } = req.body;
-    const apiKey = process.env.DATANEWTON_API_KEY;
+    const settings = getSystemSettings();
 
-    if (!apiKey) {
+    if (!settings.datanewton_api_key) {
       return res.status(500).json({ error: "Datanewton API key not configured" });
     }
 
@@ -146,22 +315,39 @@ async function startServer() {
     }
 
     try {
-      // Explicitly pass empty strings for optional params to avoid 409 Conflict error
-      const response = await axios.get("https://api.datanewton.ru/v1/counterparty", {
-        params: {
-          key: apiKey,
-          inn: String(inn),
-          ogrn: "",
-          filters: ""
+      const cleanInn = String(inn).trim();
+      
+      // Function to fetch with retry on 409 Conflict
+      const fetchWithRetry = async (retries = 2): Promise<any> => {
+        try {
+          // Minimal parameters often work better to avoid 409 Conflict
+          const url = `https://api.datanewton.ru/v1/counterparty?inn=${cleanInn}&key=${settings.datanewton_api_key}`;
+          console.log("Requesting Datanewton API:", url.replace(settings.datanewton_api_key || "", "HIDDEN"));
+          return await axios.get(url);
+        } catch (err: any) {
+          // 409 Conflict often means the server is busy processing this INN, a retry usually helps
+          if (err.response?.status === 409 && retries > 0) {
+            console.log(`Datanewton 409 Conflict for ${cleanInn}, retrying in 2s... (${retries} left)`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return fetchWithRetry(retries - 1);
+          }
+          throw err;
         }
-      });
+      };
+
+      const response = await fetchWithRetry();
 
       const result = response.data;
-      console.log("Datanewton API Response for INN", inn, ":", JSON.stringify(result, null, 2));
+      console.log("Datanewton API Response for INN", cleanInn, ":", JSON.stringify(result, null, 2));
 
-      // The API might return an object with company/individual or an empty object
+      // Check if we have any business data (company or individual/IP)
       if (!result || (!result.company && !result.individual)) {
-        return res.status(404).json({ error: "Организация не найдена" });
+        // If it's a self-employed person, the API might return basic info or nothing
+        const topLevelName = result.fio || result.name;
+        if (topLevelName && typeof topLevelName === 'string') {
+          return res.json({ ...result, name: topLevelName });
+        }
+        return res.status(404).json({ error: "Организация или ИП не найдены. Убедитесь, что ИНН принадлежит юридическому лицу или ИП." });
       }
 
       // Extract name from company or individual based on provided structure
@@ -627,12 +813,67 @@ async function startServer() {
   });
 
   // Admin API
+  app.get("/api/admin/settings", (req, res) => {
+    const settings = getSystemSettings();
+    res.json(settings);
+  });
+
+  app.post("/api/admin/settings", (req, res) => {
+    const { 
+      robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, 
+      datanewton_api_key, smtp_host, smtp_port, smtp_user, smtp_pass, base_url 
+    } = req.body;
+
+    try {
+      db.prepare(`
+        UPDATE system_settings SET 
+          robokassa_login = ?, 
+          robokassa_pass1 = ?, 
+          robokassa_pass2 = ?, 
+          robokassa_test = ?, 
+          datanewton_api_key = ?,
+          smtp_host = ?,
+          smtp_port = ?,
+          smtp_user = ?,
+          smtp_pass = ?,
+          base_url = ?
+        WHERE id = 1
+      `).run(
+        robokassa_login, 
+        robokassa_pass1, 
+        robokassa_pass2, 
+        robokassa_test ? 1 : 0, 
+        datanewton_api_key,
+        smtp_host,
+        smtp_port,
+        smtp_user,
+        smtp_pass,
+        base_url
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Update settings error:", err);
+      res.status(500).json({ error: "Failed to update settings" });
+    }
+  });
+
   app.get("/api/admin/users", (req, res) => {
     try {
-      const users = db.prepare("SELECT id, inn, name, type, email FROM users").all();
+      const users = db.prepare("SELECT id, inn, name, type, email, subscription FROM users").all();
       res.json(users);
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/subscription", (req, res) => {
+    const { id } = req.params;
+    const { subscription } = req.body;
+    try {
+      db.prepare("UPDATE users SET subscription = ? WHERE id = ?").run(JSON.stringify(subscription), id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update subscription" });
     }
   });
 
