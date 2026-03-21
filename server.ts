@@ -29,7 +29,9 @@ db.exec(`
     email TEXT,
     password TEXT,
     settings TEXT, -- JSON string
-    subscription TEXT -- JSON string
+    subscription TEXT, -- JSON string
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_login DATETIME
   );
 
   CREATE TABLE IF NOT EXISTS products (
@@ -104,7 +106,7 @@ db.exec(`
   );
 
   INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url)
-  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', process.env.APP_URL);
+  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', '${process.env.APP_URL || ''}');
 `);
 
 // Helper to get system settings
@@ -417,6 +419,7 @@ async function startServer() {
     const { inn, password } = req.body;
     const user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(inn, password);
     if (user) {
+      db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
       if (user.settings) {
         user.settings = JSON.parse(user.settings);
       }
@@ -859,10 +862,25 @@ async function startServer() {
 
   app.get("/api/admin/users", (req, res) => {
     try {
-      const users = db.prepare("SELECT id, inn, name, type, email, subscription FROM users").all();
+      const users = db.prepare("SELECT * FROM users").all();
       res.json(users);
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, email, inn, type, subscription } = req.body;
+    
+    try {
+      db.prepare("UPDATE users SET name = ?, email = ?, inn = ?, type = ?, subscription = ? WHERE id = ?")
+        .run(name, email, inn, type, typeof subscription === 'string' ? subscription : JSON.stringify(subscription), id);
+      
+      const updatedUser = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+      res.json(updatedUser);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
