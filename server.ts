@@ -181,13 +181,6 @@ function seedDatabase() {
   console.log("Database seeded successfully");
 }
 
-// Check if we need to seed
-const testUser = db.prepare("SELECT * FROM users WHERE inn = ?").get('1234567890');
-if (!testUser || testUser.password !== 'password') {
-  console.log("Seeding database...");
-  seedDatabase();
-}
-
 // Migration: Add columns if they don't exist
 try {
   db.prepare("ALTER TABLE system_settings ADD COLUMN base_url TEXT").run();
@@ -204,6 +197,13 @@ try {
 try {
   db.prepare("ALTER TABLE users ADD COLUMN last_login DATETIME").run();
 } catch (e) {}
+
+// Check if we need to seed
+const testUser = db.prepare("SELECT * FROM users WHERE inn = ?").get('1234567890');
+if (!testUser || testUser.password !== 'password') {
+  console.log("Seeding database...");
+  seedDatabase();
+}
 
 // Email Transporter Setup
 // Transporter is created dynamically in sendWelcomeEmail using system settings
