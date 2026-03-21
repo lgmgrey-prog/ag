@@ -104,10 +104,30 @@ db.exec(`
     smtp_pass TEXT,
     base_url TEXT
   );
-
-  INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url)
-  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', 'https://ais-dev-7tmxg5o6b6xmc5shz4ehag-497192293449.europe-west2.run.app');
 `);
+
+// Migration: Add columns if they don't exist
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN base_url TEXT").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN subscription TEXT").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN last_login DATETIME").run();
+} catch (e) {}
+
+// Initial system settings
+db.prepare(`
+  INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url)
+  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', ?)
+`).run(process.env.APP_URL || 'https://ais-dev-7tmxg5o6b6xmc5shz4ehag-497192293449.europe-west2.run.app');
 
 // Helper to get system settings
 function getSystemSettings() {
@@ -182,21 +202,7 @@ function seedDatabase() {
 }
 
 // Migration: Add columns if they don't exist
-try {
-  db.prepare("ALTER TABLE system_settings ADD COLUMN base_url TEXT").run();
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE users ADD COLUMN subscription TEXT").run();
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP").run();
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE users ADD COLUMN last_login DATETIME").run();
-} catch (e) {}
+// Moved up to before initial insert
 
 // Check if we need to seed
 const testUser = db.prepare("SELECT * FROM users WHERE inn = ?").get('1234567890');
@@ -1203,4 +1209,14 @@ async function startServer() {
   });
 }
 
-startServer();
+process.on('uncaughtException', (err) => {
+  console.error('CRITICAL: Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+startServer().catch(err => {
+  console.error('CRITICAL: Failed to start server:', err);
+});
