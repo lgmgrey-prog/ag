@@ -2343,6 +2343,140 @@ const SubscriptionModal = ({ user, onClose, onUpdate }: { user: any, onClose: ()
   );
 };
 
+const UserDetailsView = ({ userId, onBack }: { userId: number, onBack: () => void }) => {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/admin/users/${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        setUser(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch user details:', err);
+        setLoading(false);
+      });
+  }, [userId]);
+
+  if (loading) return <div className="flex justify-center py-20"><RefreshCw className="animate-spin text-zinc-400" /></div>;
+  if (!user) return <div className="p-8 text-center text-zinc-500">Пользователь не найден</div>;
+
+  const sub = user.subscription;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="space-y-8"
+    >
+      <div className="flex items-center gap-4">
+        <button onClick={onBack} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+          <ArrowLeft size={24} />
+        </button>
+        <div>
+          <h2 className="text-2xl font-bold text-zinc-900">{user.name}</h2>
+          <p className="text-sm text-zinc-500">ID: #{user.id}</p>
+        </div>
+        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
+          user.type === 'restaurant' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
+        }`}>
+          {user.type === 'restaurant' ? 'Ресторан' : 'Поставщик'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Info */}
+        <div className="lg:col-span-2 space-y-8">
+          <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-zinc-900 mb-6">Основная информация</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">ИНН</p>
+                <p className="font-bold text-zinc-900">{user.inn}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Email</p>
+                <p className="font-bold text-zinc-900">{user.email || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Дата регистрации</p>
+                <p className="font-bold text-zinc-900">{user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Последний вход</p>
+                <p className="font-bold text-zinc-900">{user.last_login ? new Date(user.last_login).toLocaleString() : 'Никогда'}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-zinc-900 mb-6">Последние заказы</h3>
+            <div className="space-y-4">
+              {user.recentOrders?.length > 0 ? user.recentOrders.map((order: any, idx: number) => (
+                <div key={idx} className="flex justify-between items-center p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                  <div>
+                    <p className="font-bold text-zinc-900">Заказ #{order.id}</p>
+                    <p className="text-xs text-zinc-500">{new Date(order.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-emerald-600">{order.total} ₽</p>
+                    <p className="text-[10px] font-bold uppercase text-zinc-400">{order.status}</p>
+                  </div>
+                </div>
+              )) : <p className="text-zinc-400 text-center py-4">Заказов пока нет</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar Info */}
+        <div className="space-y-8">
+          <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-zinc-900 mb-6">Подписка</h3>
+            {sub?.status === 'active' ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                  <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Активна</p>
+                  <p className="text-xl font-bold text-emerald-700">{sub.plan === 'monthly' ? 'Месячная' : sub.plan === 'yearly' ? 'Годовая' : 'Пробная'}</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-500">Начало:</span>
+                    <span className="font-bold text-zinc-900">{sub.startedAt ? new Date(sub.startedAt).toLocaleDateString() : '-'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-500">Окончание:</span>
+                    <span className="font-bold text-zinc-900">{sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString() : '-'}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 text-center">
+                <p className="text-zinc-400 font-bold">Нет активной подписки</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-zinc-900 mb-6">Статистика</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500">Сообщений:</span>
+                <span className="font-bold text-zinc-900">{user.messageCount}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500">Накладных:</span>
+                <span className="font-bold text-zinc-900">{user.recentInvoices?.length || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 const AdminDashboard = ({ user }: { user: User }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -2352,6 +2486,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedPrice, setSelectedPrice] = useState<any>(null);
   const [selectedUserForSub, setSelectedUserForSub] = useState<any>(null);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
   const [confirmData, setConfirmData] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
 
@@ -2462,80 +2597,87 @@ const AdminDashboard = ({ user }: { user: User }) => {
         </div>
       )}
 
-      <AnimatePresence mode="wait">
-        {activeAdminTab === 'users' && (
-          <motion.div 
-            key="users"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm"
-          >
-            <div className="p-6 border-b border-zinc-100">
-              <h2 className="text-xl font-bold text-zinc-900">Управление пользователями</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                    <th className="px-8 py-5">ID</th>
-                    <th className="px-8 py-5">ИНН</th>
-                    <th className="px-8 py-5">Название</th>
-                    <th className="px-8 py-5">Тип</th>
-                    <th className="px-8 py-5">Email</th>
-                    <th className="px-8 py-5">Подписка</th>
-                    <th className="px-8 py-5">Действия</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {users.map((u, i) => {
-                    const sub = typeof u.subscription === 'string' ? JSON.parse(u.subscription) : u.subscription;
-                    return (
-                      <tr key={i} className="hover:bg-zinc-50 transition-colors">
-                        <td className="px-8 py-5 text-zinc-500">#{u.id}</td>
-                        <td className="px-8 py-5 font-bold text-zinc-900">{u.inn}</td>
-                        <td className="px-8 py-5 font-medium text-zinc-700">{u.name}</td>
-                        <td className="px-8 py-5">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
-                            u.type === 'admin' ? 'bg-purple-50 text-purple-600' : 
-                            u.type === 'restaurant' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
-                          }`}>
-                            {u.type === 'admin' ? 'Админ' : u.type === 'restaurant' ? 'Ресторан' : 'Поставщик'}
-                          </span>
-                        </td>
-                        <td className="px-8 py-5 text-zinc-500">{u.email || '-'}</td>
-                        <td className="px-8 py-5">
-                          {u.type === 'restaurant' ? (
-                            <button 
-                              onClick={() => setSelectedUserForSub(u)}
-                              className={`text-[10px] font-bold uppercase px-2 py-1 rounded border transition-all ${
-                                sub?.status === 'active' 
-                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' 
-                                  : 'bg-zinc-50 text-zinc-400 border-zinc-200 hover:bg-zinc-100'
-                              }`}
-                            >
-                              {sub?.status === 'active' ? (sub.plan === 'monthly' ? 'Месяц' : sub.plan === 'yearly' ? 'Год' : 'Пробный') : 'Нет'}
-                            </button>
-                          ) : '-'}
-                        </td>
-                        <td className="px-8 py-5">
-                          {u.type !== 'admin' && (
-                            <button 
-                              onClick={() => deleteUser(u.id)}
-                              className="text-red-500 hover:text-red-700 font-bold text-sm"
-                            >
-                              Удалить
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
-        )}
+      {selectedUserId ? (
+        <UserDetailsView userId={selectedUserId} onBack={() => setSelectedUserId(null)} />
+      ) : (
+        <AnimatePresence mode="wait">
+          {activeAdminTab === 'users' && (
+            <motion.div 
+              key="users"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm"
+            >
+              <div className="p-6 border-b border-zinc-100">
+                <h2 className="text-xl font-bold text-zinc-900">Управление пользователями</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                      <th className="px-8 py-5">ID</th>
+                      <th className="px-8 py-5">ИНН</th>
+                      <th className="px-8 py-5">Название</th>
+                      <th className="px-8 py-5">Тип</th>
+                      <th className="px-8 py-5">Email</th>
+                      <th className="px-8 py-5">Подписка</th>
+                      <th className="px-8 py-5">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {users.map((u, i) => {
+                      const sub = typeof u.subscription === 'string' ? JSON.parse(u.subscription) : u.subscription;
+                      return (
+                        <tr 
+                          key={i} 
+                          onClick={() => setSelectedUserId(u.id)}
+                          className="hover:bg-zinc-50 transition-colors cursor-pointer"
+                        >
+                          <td className="px-8 py-5 text-zinc-500">#{u.id}</td>
+                          <td className="px-8 py-5 font-bold text-zinc-900">{u.inn}</td>
+                          <td className="px-8 py-5 font-medium text-zinc-700">{u.name}</td>
+                          <td className="px-8 py-5">
+                            <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
+                              u.type === 'admin' ? 'bg-purple-50 text-purple-600' : 
+                              u.type === 'restaurant' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
+                            }`}>
+                              {u.type === 'admin' ? 'Админ' : u.type === 'restaurant' ? 'Ресторан' : 'Поставщик'}
+                            </span>
+                          </td>
+                          <td className="px-8 py-5 text-zinc-500">{u.email || '-'}</td>
+                          <td className="px-8 py-5">
+                            {u.type === 'restaurant' ? (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setSelectedUserForSub(u); }}
+                                className={`text-[10px] font-bold uppercase px-2 py-1 rounded border transition-all ${
+                                  sub?.status === 'active' 
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' 
+                                    : 'bg-zinc-50 text-zinc-400 border-zinc-200 hover:bg-zinc-100'
+                                }`}
+                              >
+                                {sub?.status === 'active' ? (sub.plan === 'monthly' ? 'Месяц' : sub.plan === 'yearly' ? 'Год' : 'Пробный') : 'Нет'}
+                              </button>
+                            ) : '-'}
+                          </td>
+                          <td className="px-8 py-5">
+                            {u.type !== 'admin' && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }}
+                                className="text-red-500 hover:text-red-700 font-bold text-sm"
+                              >
+                                Удалить
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
 
         {activeAdminTab === 'invoices' && (
           <motion.div 
@@ -2661,6 +2803,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
         )}
 
       </AnimatePresence>
+      )}
 
       <AnimatePresence>
         {selectedInvoice && (
