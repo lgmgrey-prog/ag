@@ -514,29 +514,23 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
                   О сервисе
                 </div>
                 <h2 className="text-4xl md:text-6xl font-bold text-zinc-900 tracking-tight leading-[1.1]">
-                  Ваш надежный <br />
-                  партнер в <span className="text-emerald-600">HoReCa</span>
+                  Ресткост — ваш партнер <br />
+                  в мире <span className="text-emerald-600">HoReCa</span>
                 </h2>
               </div>
 
-              <div className="space-y-6 text-lg md:text-xl text-zinc-600 leading-relaxed font-light">
+              <div className="space-y-6 text-lg md:text-xl text-zinc-600 leading-relaxed">
                 <p>
-                  <span className="font-bold text-zinc-900">Ресткост</span> — это инновационный сервис для сравнения цен на товары поставщиков horeca в вашем городе. 
-                </p>
-                <p>
-                  Ресторанам мы помогаем существенно <span className="text-zinc-900 font-medium underline decoration-emerald-500/30 underline-offset-4">сэкономить бюджет на закуп</span>, а поставщикам — найти новых лояльных клиентов.
-                </p>
-                <p>
-                  На нашей платформе собрана полная база поставщиков вашего региона. Это позволяет в реальном времени отслеживать актуальные предложения, контролировать рост цен и первыми узнавать о сезонных новинках.
+                  Ресткост - это сервис для сравнения цен на товары поставщиков horeca в вашем городе. Ресторанам помогаем сэкономить бюджет на закуп, а поставщикам найти новых клиентов. На сайте собрана полная база поставщиков вашего города/региона, что позволяет отслеживать все актуальные предложения поставщиков, контролировать увеличение цен и быть в курсе сезонных предложений.
                 </p>
                 
                 <div className="pt-6">
-                  <div className="flex items-center gap-4 p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
+                  <div className="flex items-start gap-4 p-6 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
                     <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center shrink-0 text-emerald-600">
-                      <Zap size={24} />
+                      <MessageSquare size={24} />
                     </div>
-                    <p className="text-sm font-medium text-zinc-800">
-                      Избавьтесь от хаоса в мессенджерах. Объедините все коммуникации с поставщиками в одном удобном личном кабинете.
+                    <p className="text-sm font-medium text-zinc-800 leading-relaxed">
+                      Сервис позволяет избавиться от огромного количества чатов в мессенджерах и объединить их в вашем личном кабинете.
                     </p>
                   </div>
                 </div>
