@@ -1692,16 +1692,29 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   };
 
   const handleAnalyze = async () => {
+    if (prices.length === 0) {
+      showToast?.('Нет данных для анализа. Подождите загрузки прайсов.', 'error');
+      return;
+    }
     setLoading(true);
-    const matrix = [
-      { name: "Помидоры", currentPrice: 160 },
-      { name: "Говядина вырезка", currentPrice: 950 }
-    ];
+    // Create a matrix of unique products with their average or first price as "current"
+    const uniqueProducts = Array.from(new Set(prices.map(p => p.product_name)));
+    const matrix = uniqueProducts.slice(0, 5).map(name => {
+      const p = prices.find(pr => pr.product_name === name);
+      return { name, currentPrice: p ? p.price * 1.1 : 100 }; // Mock "current" as 10% higher than market
+    });
+
     try {
       const result = await analyzePrices(matrix, prices);
       setRecommendations(result.recommendations || []);
+      if (result.recommendations?.length > 0) {
+        showToast?.(`Найдено ${result.recommendations.length} выгодных предложений!`, 'success');
+      } else {
+        showToast?.('Выгодных предложений пока не найдено.', 'success');
+      }
     } catch (e) {
       console.error(e);
+      showToast?.('Ошибка при анализе цен', 'error');
     } finally {
       setLoading(false);
     }
@@ -2343,7 +2356,182 @@ const SubscriptionModal = ({ user, onClose, onUpdate }: { user: any, onClose: ()
   );
 };
 
-const AdminDashboard = ({ user }: { user: User }) => {
+const UserDetailView = ({ user, onBack, onUpdate, showToast }: { user: any, onBack: () => void, onUpdate: () => void, showToast: (m: string, t?: 'success' | 'error') => void }) => {
+  const [sub, setSub] = useState<any>(typeof user.subscription === 'string' ? JSON.parse(user.subscription) : user.subscription || {});
+  const [basicInfo, setBasicInfo] = useState({ name: user.name, email: user.email, password: user.password });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveSub = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/subscription`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub })
+      });
+      if (res.ok) {
+        showToast('Подписка обновлена', 'success');
+        onUpdate();
+      }
+    } catch (err) {
+      showToast('Ошибка при сохранении', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveBasic = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(basicInfo)
+      });
+      if (res.ok) {
+        showToast('Данные профиля обновлены', 'success');
+        onUpdate();
+      }
+    } catch (err) {
+      showToast('Ошибка при сохранении', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className="space-y-8"
+    >
+      <div className="flex items-center gap-4 mb-6">
+        <button onClick={onBack} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
+          <ArrowLeft size={24} />
+        </button>
+        <div>
+          <h2 className="text-2xl font-bold text-zinc-900">{user.name}</h2>
+          <p className="text-zinc-500">Профиль пользователя #{user.id}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-2 space-y-8">
+          <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-zinc-900 mb-6 uppercase tracking-widest text-xs">Основная информация</h3>
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Название</label>
+                <input 
+                  type="text" 
+                  value={basicInfo.name}
+                  onChange={e => setBasicInfo({...basicInfo, name: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Email</label>
+                <input 
+                  type="email" 
+                  value={basicInfo.email}
+                  onChange={e => setBasicInfo({...basicInfo, email: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">ИНН (только чтение)</label>
+                <p className="font-bold text-zinc-900 px-4 py-3 bg-zinc-50 rounded-xl border border-zinc-100">{user.inn}</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Пароль</label>
+                <input 
+                  type="text" 
+                  value={basicInfo.password}
+                  onChange={e => setBasicInfo({...basicInfo, password: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+            <button 
+              onClick={handleSaveBasic}
+              disabled={isSaving}
+              className="bg-zinc-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
+            >
+              Сохранить изменения
+            </button>
+          </div>
+
+          <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-zinc-900 mb-6 uppercase tracking-widest text-xs">Настройки и данные</h3>
+            <pre className="bg-zinc-50 p-4 rounded-2xl text-xs overflow-auto max-h-64">
+              {JSON.stringify(typeof user.settings === 'string' ? JSON.parse(user.settings) : user.settings, null, 2)}
+            </pre>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-zinc-900 mb-6 uppercase tracking-widest text-xs">Управление подпиской</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Статус</label>
+                <select 
+                  value={sub.active ? 'active' : 'inactive'}
+                  onChange={(e) => setSub({...sub, active: e.target.value === 'active'})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                >
+                  <option value="active">Активна</option>
+                  <option value="inactive">Не активна</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Тариф</label>
+                <select 
+                  value={sub.plan || 'none'}
+                  onChange={(e) => setSub({...sub, plan: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                >
+                  <option value="none">Нет</option>
+                  <option value="monthly">Месячный</option>
+                  <option value="yearly">Годовой</option>
+                  <option value="trial">Пробный</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Дата начала</label>
+                <input 
+                  type="date" 
+                  value={sub.startedAt ? sub.startedAt.split('T')[0] : ''}
+                  onChange={(e) => setSub({...sub, startedAt: new Date(e.target.value).toISOString()})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Дата окончания</label>
+                <input 
+                  type="date" 
+                  value={sub.expiresAt ? sub.expiresAt.split('T')[0] : ''}
+                  onChange={(e) => setSub({...sub, expiresAt: new Date(e.target.value).toISOString()})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
+              <button 
+                onClick={handleSaveSub}
+                disabled={isSaving}
+                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 mt-4"
+              >
+                {isSaving ? 'Сохранение...' : 'Обновить подписку'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const AdminDashboard = ({ user, showToast }: { user: User, showToast: (m: string, t?: 'success' | 'error') => void }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -2351,8 +2539,9 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'invoices' | 'prices' | 'settings'>('users');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedPrice, setSelectedPrice] = useState<any>(null);
-  const [selectedUserForSub, setSelectedUserForSub] = useState<any>(null);
-
+  const [viewingUser, setViewingUser] = useState<any>(null);
+  const [systemSettings, setSystemSettings] = useState<any>(null);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [confirmData, setConfirmData] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
 
   const fetchData = () => {
@@ -2360,6 +2549,26 @@ const AdminDashboard = ({ user }: { user: User }) => {
     fetch('/api/admin/stats').then(res => res.json()).then(setStats);
     fetch('/api/admin/invoices').then(res => res.json()).then(setInvoices);
     fetch('/api/admin/prices').then(res => res.json()).then(setPrices);
+    fetch('/api/admin/settings').then(res => res.json()).then(setSystemSettings);
+  };
+
+  const saveSystemSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(systemSettings)
+      });
+      if (res.ok) {
+        showToast('Системные настройки сохранены', 'success');
+      }
+    } catch (err) {
+      showToast('Ошибка при сохранении', 'error');
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   useEffect(() => {
@@ -2463,7 +2672,14 @@ const AdminDashboard = ({ user }: { user: User }) => {
       )}
 
       <AnimatePresence mode="wait">
-        {activeAdminTab === 'users' && (
+        {viewingUser ? (
+          <UserDetailView 
+            user={viewingUser} 
+            onBack={() => setViewingUser(null)} 
+            onUpdate={fetchData} 
+            showToast={showToast} 
+          />
+        ) : activeAdminTab === 'users' && (
           <motion.div 
             key="users"
             initial={{ opacity: 0, y: 10 }}
@@ -2506,19 +2722,22 @@ const AdminDashboard = ({ user }: { user: User }) => {
                         <td className="px-8 py-5 text-zinc-500">{u.email || '-'}</td>
                         <td className="px-8 py-5">
                           {u.type === 'restaurant' ? (
-                            <button 
-                              onClick={() => setSelectedUserForSub(u)}
-                              className={`text-[10px] font-bold uppercase px-2 py-1 rounded border transition-all ${
-                                sub?.status === 'active' 
-                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' 
-                                  : 'bg-zinc-50 text-zinc-400 border-zinc-200 hover:bg-zinc-100'
-                              }`}
-                            >
-                              {sub?.status === 'active' ? (sub.plan === 'monthly' ? 'Месяц' : sub.plan === 'yearly' ? 'Год' : 'Пробный') : 'Нет'}
-                            </button>
+                            <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded border transition-all ${
+                              sub?.active 
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                                : 'bg-zinc-50 text-zinc-400 border-zinc-200'
+                            }`}>
+                              {sub?.active ? (sub.plan === 'monthly' ? 'Месяц' : sub.plan === 'yearly' ? 'Год' : 'Пробный') : 'Нет'}
+                            </span>
                           ) : '-'}
                         </td>
-                        <td className="px-8 py-5">
+                        <td className="px-8 py-5 space-x-3">
+                          <button 
+                            onClick={() => setViewingUser(u)}
+                            className="text-emerald-600 hover:text-emerald-800 font-bold text-sm"
+                          >
+                            Открыть
+                          </button>
                           {u.type !== 'admin' && (
                             <button 
                               onClick={() => deleteUser(u.id)}
@@ -2656,8 +2875,101 @@ const AdminDashboard = ({ user }: { user: User }) => {
           </motion.div>
         )}
 
-        {activeAdminTab === 'settings' && (
-          <SystemSettingsView />
+        {activeAdminTab === 'settings' && systemSettings && (
+          <motion.div 
+            key="settings"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm p-8"
+          >
+            <h2 className="text-xl font-bold text-zinc-900 mb-8">Системные настройки</h2>
+            <form onSubmit={saveSystemSettings} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Robokassa</h3>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Merchant Login</label>
+                  <input 
+                    type="text" 
+                    value={systemSettings.robokassa_login}
+                    onChange={e => setSystemSettings({...systemSettings, robokassa_login: e.target.value})}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Password 1</label>
+                  <input 
+                    type="password" 
+                    value={systemSettings.robokassa_pass1}
+                    onChange={e => setSystemSettings({...systemSettings, robokassa_pass1: e.target.value})}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="robokassa_test"
+                    checked={systemSettings.robokassa_test}
+                    onChange={e => setSystemSettings({...systemSettings, robokassa_test: e.target.checked})}
+                    className="w-5 h-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <label htmlFor="robokassa_test" className="text-sm font-bold text-zinc-700">Тестовый режим</label>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Datanewton & SMTP</h3>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Datanewton API Key</label>
+                  <input 
+                    type="password" 
+                    value={systemSettings.datanewton_api_key}
+                    onChange={e => setSystemSettings({...systemSettings, datanewton_api_key: e.target.value})}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">SMTP Host</label>
+                  <input 
+                    type="text" 
+                    value={systemSettings.smtp_host}
+                    onChange={e => setSystemSettings({...systemSettings, smtp_host: e.target.value})}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">SMTP User</label>
+                    <input 
+                      type="text" 
+                      value={systemSettings.smtp_user}
+                      onChange={e => setSystemSettings({...systemSettings, smtp_user: e.target.value})}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">SMTP Password</label>
+                    <input 
+                      type="password" 
+                      value={systemSettings.smtp_pass}
+                      onChange={e => setSystemSettings({...systemSettings, smtp_pass: e.target.value})}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="md:col-span-2 pt-8 border-t border-zinc-100 flex justify-end">
+                <button 
+                  type="submit"
+                  disabled={isSavingSettings}
+                  className="px-12 py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
+                >
+                  {isSavingSettings ? 'Сохранение...' : 'Сохранить системные настройки'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
         )}
 
       </AnimatePresence>
@@ -2676,16 +2988,6 @@ const AdminDashboard = ({ user }: { user: User }) => {
           <PriceDetailModal 
             price={selectedPrice} 
             onClose={() => setSelectedPrice(null)} 
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {selectedUserForSub && (
-          <SubscriptionModal 
-            user={selectedUserForSub}
-            onClose={() => setSelectedUserForSub(null)}
-            onUpdate={fetchData}
           />
         )}
       </AnimatePresence>
@@ -3591,7 +3893,10 @@ export default function App() {
           user.type === 'restaurant' ? (
             <RestaurantDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} onPayment={handlePayment} />
           ) : user.type === 'admin' ? (
-            <AdminDashboard user={user} />
+            <AdminDashboard 
+        user={user} 
+        showToast={showToast}
+      />
           ) : (
             <SupplierDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} />
           )

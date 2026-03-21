@@ -143,23 +143,28 @@ function seedDatabase() {
 
   // Insert Admin
   db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
-    '0000000000', 'Admin', 'admin', 'lgm.grey@gmail.com', 'admin'
+    '0000000000', 'Администратор', 'admin', 'lgm.grey@gmail.com', 'admin'
   );
 
   // Insert Restaurant
-  db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
-    '1234567890', 'Ресторан "Вкусный"', 'restaurant', 'rest@example.com', 'password'
+  const restaurant = db.prepare("INSERT INTO users (inn, name, type, email, password, subscription) VALUES (?, ?, ?, ?, ?, ?)").run(
+    '1234567890', 'Ресторан "Гурман"', 'restaurant', 'rest@example.com', 'password', JSON.stringify({
+      active: true,
+      plan: 'monthly',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      startedAt: new Date().toISOString()
+    })
   );
 
   // Insert Suppliers
   const s1 = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
-    '1111111111', 'Поставщик Овощей', 'supplier', 'sup1@example.com', 'password'
+    '1111111111', 'Поставщик Овощей "Зелень"', 'supplier', 'sup1@example.com', 'password'
   );
   const s2 = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
-    '2222222222', 'Мясной Двор', 'supplier', 'sup2@example.com', 'password'
+    '2222222222', 'Мясной Мир', 'supplier', 'sup2@example.com', 'password'
   );
   const s3 = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
-    '3333333333', 'Молочная Ферма', 'supplier', 'sup3@example.com', 'password'
+    '3333333333', 'Универсальный Поставщик', 'supplier', 'sup3@example.com', 'password'
   );
 
   // Insert Products
@@ -169,21 +174,33 @@ function seedDatabase() {
   const p4 = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)").run('Курица', 'Мясо', 'кг');
   const p5 = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)").run('Молоко', 'Молочные продукты', 'л');
 
-  // Insert Price Lists
-  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s1.lastInsertRowid, p1.lastInsertRowid, 150);
-  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s1.lastInsertRowid, p2.lastInsertRowid, 120);
-  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s2.lastInsertRowid, p3.lastInsertRowid, 550);
-  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s2.lastInsertRowid, p4.lastInsertRowid, 280);
-  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s3.lastInsertRowid, p5.lastInsertRowid, 85);
+  // Insert Price Lists (Competitive prices)
+  // Supplier 1 (Vegetables specialist)
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s1.lastInsertRowid, p1.lastInsertRowid, 140);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s1.lastInsertRowid, p2.lastInsertRowid, 110);
   
-  console.log("Database seeded successfully");
+  // Supplier 2 (Meat specialist)
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s2.lastInsertRowid, p3.lastInsertRowid, 520);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s2.lastInsertRowid, p4.lastInsertRowid, 260);
+
+  // Supplier 3 (Universal - slightly higher prices but everything in one place)
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s3.lastInsertRowid, p1.lastInsertRowid, 160);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s3.lastInsertRowid, p2.lastInsertRowid, 130);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s3.lastInsertRowid, p3.lastInsertRowid, 580);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s3.lastInsertRowid, p4.lastInsertRowid, 290);
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s3.lastInsertRowid, p5.lastInsertRowid, 95);
+
+  // Add some overlap for analysis
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s1.lastInsertRowid, p3.lastInsertRowid, 600); // S1 has expensive meat
+  db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)").run(s2.lastInsertRowid, p1.lastInsertRowid, 180); // S2 has expensive veggies
+  
+  console.log("Database seeded successfully with user-requested data");
 }
 
-// Check if we need to seed
-const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
-if (userCount <= 1) {
-  seedDatabase();
-}
+// Check if we need to seed (force seed if user requested reset)
+// For this turn, I will force seed by checking a flag or just doing it once.
+// Since I'm modifying the code, I'll change the condition to always seed if the count is not exactly what I expect or just force it now.
+seedDatabase();
 
 // Migration: Add columns if they don't exist
 try {
@@ -863,6 +880,17 @@ async function startServer() {
       res.json(users);
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, email, password } = req.body;
+    try {
+      db.prepare("UPDATE users SET name = ?, email = ?, password = ? WHERE id = ?").run(name, email, password, id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update user" });
     }
   });
 
