@@ -196,6 +196,10 @@ try {
   db.prepare("ALTER TABLE users ADD COLUMN subscription TEXT").run();
 } catch (e) {}
 
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN last_login DATETIME").run();
+} catch (e) {}
+
 // Email Transporter Setup
 // Transporter is created dynamically in sendWelcomeEmail using system settings
 
@@ -392,43 +396,53 @@ async function startServer() {
 
   // Auth / Registration
   app.post("/api/auth/register", async (req, res) => {
-    const { inn, name, type, email } = req.body;
-    
-    if (!inn || !name || !type || !email) {
-      return res.status(400).json({ error: "Все поля обязательны для заполнения" });
-    }
-
-    const password = Math.random().toString(36).slice(-8); // Generate random 8-char password
-    
     try {
-      const info = db.prepare("INSERT INTO users (inn, name, type, email, password, settings) VALUES (?, ?, ?, ?, ?, ?)").run(inn, name, type, email, password, JSON.stringify({}));
-      await sendWelcomeEmail(email, password);
-      res.json({ id: info.lastInsertRowid, inn, name, type, email, settings: {} });
-    } catch (e) {
-      console.error("Registration error:", e);
-      const user = db.prepare("SELECT * FROM users WHERE inn = ?").get(inn);
-      if (user) {
-        res.status(400).json({ error: "Пользователь с таким ИНН уже существует. Пожалуйста, войдите." });
-      } else {
-        res.status(500).json({ error: `Ошибка регистрации: ${e.message}` });
+      const { inn, name, type, email } = req.body;
+      
+      if (!inn || !name || !type || !email) {
+        return res.status(400).json({ error: "Все поля обязательны для заполнения" });
       }
+
+      const password = Math.random().toString(36).slice(-8); // Generate random 8-char password
+      
+      try {
+        const info = db.prepare("INSERT INTO users (inn, name, type, email, password, settings) VALUES (?, ?, ?, ?, ?, ?)").run(inn, name, type, email, password, JSON.stringify({}));
+        await sendWelcomeEmail(email, password);
+        res.json({ id: info.lastInsertRowid, inn, name, type, email, settings: {} });
+      } catch (e: any) {
+        console.error("Registration error:", e);
+        const user = db.prepare("SELECT * FROM users WHERE inn = ?").get(inn);
+        if (user) {
+          res.status(400).json({ error: "Пользователь с таким ИНН уже существует. Пожалуйста, войдите." });
+        } else {
+          res.status(500).json({ error: `Ошибка регистрации: ${e.message}` });
+        }
+      }
+    } catch (err: any) {
+      console.error("Auth register error:", err);
+      res.status(500).json({ error: "Ошибка при регистрации" });
     }
   });
 
   app.post("/api/auth/login", (req, res) => {
-    const { inn, password } = req.body;
-    const user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(inn, password);
-    if (user) {
-      db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
-      if (user.settings) {
-        user.settings = JSON.parse(user.settings);
+    try {
+      const { inn, password } = req.body;
+      const user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(inn, password) as any;
+      if (user) {
+        db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
+        if (user.settings) {
+          user.settings = JSON.parse(user.settings);
+        }
+        if (user.subscription) {
+          user.subscription = JSON.parse(user.subscription);
+        }
+        res.json(user);
+      } else {
+        res.status(401).json({ error: "Неверный ИНН или пароль" });
       }
-      if (user.subscription) {
-        user.subscription = JSON.parse(user.subscription);
-      }
-      res.json(user);
-    } else {
-      res.status(401).json({ error: "Неверный ИНН или пароль" });
+    } catch (err: any) {
+      console.error("Login error:", err);
+      res.status(500).json({ error: "Ошибка при входе в систему" });
     }
   });
 

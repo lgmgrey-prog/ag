@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   BarChart3, 
+  HelpCircle,
+  Send,
   LayoutDashboard, 
   MessageSquare, 
   Package, 
@@ -8,7 +10,6 @@ import {
   TrendingUp, 
   User as UserIcon, 
   Search, 
-  Send,
   Bell, 
   FileText, 
   Plus, 
@@ -62,11 +63,12 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
   );
 };
 
-const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onNotificationClick }: { 
+const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, onNotificationClick }: { 
   user: User | null, 
   onLogout: () => void, 
   onOpenAuth: () => void,
   onOpenSettings: () => void,
+  onOpenFeedback: () => void,
   onNotificationClick?: (type: string) => void
 }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -153,6 +155,13 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onNotificationClic
                   </div>
                   
                   <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
+                    <button 
+                      onClick={onOpenFeedback}
+                      className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-white rounded-lg transition-all"
+                      title="Поддержка"
+                    >
+                      <HelpCircle size={20} />
+                    </button>
                     <button 
                       onClick={onOpenSettings}
                       className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all"
@@ -662,6 +671,178 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
     </section>
   </div>
 );
+
+const FeedbackModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: () => void, user: User | null }) => {
+  const [message, setMessage] = useState('');
+  const [email, setEmail] = useState(user?.email || '');
+  const [isSending, setIsSending] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSending(true);
+    // Simulate sending feedback
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsSending(false);
+    setIsSuccess(true);
+    setTimeout(() => {
+      setIsSuccess(false);
+      setMessage('');
+      onClose();
+    }, 2000);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-zinc-900/40 backdrop-blur-sm"
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative bg-white w-full max-w-xl rounded-[1.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row border border-zinc-100"
+      >
+        {/* Left Column: Info & Telegram */}
+        <div className="md:w-5/12 bg-zinc-50 p-6 flex flex-col justify-between relative border-r border-zinc-100">
+          <div className="relative z-10">
+            <div className="w-9 h-9 bg-emerald-600 rounded-lg flex items-center justify-center mb-4 shadow-lg shadow-emerald-600/20">
+              <HelpCircle size={18} className="text-white" />
+            </div>
+            <h3 className="text-xl font-bold tracking-tight mb-2 text-zinc-900">Поддержка</h3>
+            <p className="text-zinc-500 leading-relaxed mb-4 text-xs">
+              Мы всегда рады помочь вам с любыми вопросами.
+            </p>
+
+            <div className="space-y-3">
+              <div className="flex items-start gap-2.5">
+                <div className="w-7 h-7 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 shrink-0">
+                  <CheckCircle2 size={14} />
+                </div>
+                <div>
+                  <p className="font-bold text-[11px] text-zinc-900">Помощь</p>
+                  <p className="text-[9px] text-zinc-400">Приоритетный ответ</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0">
+                  <Zap size={14} />
+                </div>
+                <div>
+                  <p className="font-bold text-[11px] text-zinc-900">Идеи</p>
+                  <p className="text-[9px] text-zinc-400">Делают нас лучше</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 mt-6">
+            <a 
+              href="https://t.me/restcost_support" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-3 bg-white border border-zinc-200 rounded-xl group hover:border-emerald-500 transition-all shadow-sm"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white">
+                  <Send size={16} />
+                </div>
+                <div>
+                  <p className="font-bold text-[11px] text-zinc-900">Telegram</p>
+                  <p className="text-[9px] text-zinc-400">Быстрый ответ</p>
+                </div>
+              </div>
+              <ArrowRight size={14} className="text-zinc-300 group-hover:text-emerald-500 transition-colors" />
+            </a>
+          </div>
+        </div>
+
+        {/* Right Column: Form */}
+        <div className="md:w-7/12 p-6 bg-white relative">
+          <button 
+            onClick={onClose} 
+            className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full hover:bg-zinc-100 transition-all text-zinc-400 hover:text-zinc-600 z-20"
+          >
+            <X size={16} />
+          </button>
+
+          <div className="h-full flex flex-col justify-center">
+            {isSuccess ? (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center space-y-3 py-4"
+              >
+                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 size={24} />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-zinc-900 mb-0.5">Отправлено!</h4>
+                  <p className="text-[11px] text-zinc-500">Мы свяжемся с вами скоро.</p>
+                </div>
+              </motion.div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <h4 className="text-base font-bold text-zinc-900 mb-0.5">Напишите нам</h4>
+                  <p className="text-[11px] text-zinc-500">Ответим на вашу почту</p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Email</label>
+                    <input 
+                      type="email" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="example@mail.com" 
+                      className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Сообщение</label>
+                    <textarea 
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Ваш вопрос..." 
+                      rows={3}
+                      className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all resize-none text-xs"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={isSending}
+                  className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/10 disabled:opacity-50 flex items-center justify-center gap-2 text-xs"
+                >
+                  {isSending ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Отправка...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={14} />
+                      Отправить
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 
 const ConfirmModal = ({ isOpen, title, message, onConfirm, onClose }: { isOpen: boolean, title: string, message: string, onConfirm: () => void, onClose: () => void }) => {
   if (!isOpen) return null;
@@ -1343,8 +1524,8 @@ const IntegrationsView = ({ user }: { user: User }) => {
       <div className="p-8">
         <div className="max-w-2xl">
           <div className="flex items-center gap-6 p-6 bg-zinc-50 rounded-2xl border border-zinc-100 mb-8">
-            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center border border-zinc-200 shadow-sm">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Iiko_logo.svg/1200px-Iiko_logo.svg.png" alt="iiko" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
+            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center border border-zinc-200 shadow-sm overflow-hidden">
+              <div className="text-orange-600 font-black text-xl tracking-tighter select-none">iiko</div>
             </div>
             <div className="flex-1">
               <h3 className="font-bold text-zinc-900 text-lg">iiko Cloud</h3>
@@ -2386,84 +2567,6 @@ const SystemSettingsView = () => {
   );
 };
 
-const SubscriptionModal = ({ user, onClose, onUpdate }: { user: any, onClose: () => void, onUpdate: () => void }) => {
-  const sub = typeof user.subscription === 'string' ? JSON.parse(user.subscription) : user.subscription;
-  const [plan, setPlan] = useState(sub?.plan || 'none');
-  const [expiresAt, setExpiresAt] = useState(sub?.expiresAt || '');
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      const subscription = plan === 'none' ? null : { plan, expiresAt, status: 'active' };
-      await fetch(`/api/admin/users/${user.id}/subscription`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscription })
-      });
-      onUpdate();
-      onClose();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
-      >
-        <div className="p-6 border-b border-zinc-100 flex justify-between items-center">
-          <h3 className="text-xl font-bold text-zinc-900">Управление подпиской</h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
-            <X size={24} />
-          </button>
-        </div>
-        <div className="p-8 space-y-6">
-          <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 mb-4">
-            <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Пользователь</p>
-            <p className="font-bold text-zinc-900">{user.name}</p>
-            <p className="text-xs text-zinc-500">{user.inn}</p>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Тарифный план</label>
-            <select 
-              value={plan}
-              onChange={(e) => setPlan(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-            >
-              <option value="none">Нет подписки</option>
-              <option value="monthly">Месячный (3 000 ₽)</option>
-              <option value="yearly">Годовой (20 000 ₽)</option>
-              <option value="trial">Пробный период</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Дата окончания</label>
-            <input 
-              type="date" 
-              value={expiresAt ? expiresAt.split('T')[0] : ''}
-              onChange={(e) => setExpiresAt(new Date(e.target.value).toISOString())}
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-            />
-          </div>
-          <button 
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
-          >
-            {isSaving ? 'Сохранение...' : 'Сохранить изменения'}
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-};
-
 const UserDetailView = ({ user, onBack, onUpdate }: { user: any, onBack: () => void, onUpdate: () => void }) => {
   const [formData, setFormData] = useState({
     name: user.name || '',
@@ -2580,55 +2683,57 @@ const UserDetailView = ({ user, onBack, onUpdate }: { user: any, onBack: () => v
             </div>
           </div>
 
-          <div className="bg-zinc-50 rounded-3xl p-6 space-y-4">
-            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Управление подпиской</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-zinc-500 ml-1">Статус</label>
-                <select 
-                  value={formData.subscription.status}
-                  onChange={e => setFormData({ 
-                    ...formData, 
-                    subscription: { ...formData.subscription, status: e.target.value } 
-                  })}
-                  className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                >
-                  <option value="none">Нет подписки</option>
-                  <option value="active">Активна</option>
-                  <option value="expired">Истекла</option>
-                  <option value="trial">Пробный период</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-zinc-500 ml-1">Тарифный план</label>
-                <select 
-                  value={formData.subscription.plan}
-                  onChange={e => setFormData({ 
-                    ...formData, 
-                    subscription: { ...formData.subscription, plan: e.target.value } 
-                  })}
-                  className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                >
-                  <option value="none">Нет</option>
-                  <option value="monthly">Месячный</option>
-                  <option value="yearly">Годовой</option>
-                  <option value="trial">Пробный</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-zinc-500 ml-1">Действует до</label>
-                <input 
-                  type="date" 
-                  value={formData.subscription.expiresAt ? new Date(formData.subscription.expiresAt).toISOString().split('T')[0] : ''}
-                  onChange={e => setFormData({ 
-                    ...formData, 
-                    subscription: { ...formData.subscription, expiresAt: e.target.value } 
-                  })}
-                  className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                />
+          {formData.type === 'restaurant' && (
+            <div className="bg-zinc-50 rounded-3xl p-6 space-y-4">
+              <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Управление подпиской</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-500 ml-1">Статус</label>
+                  <select 
+                    value={formData.subscription.status}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      subscription: { ...formData.subscription, status: e.target.value } 
+                    })}
+                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                  >
+                    <option value="none">Нет подписки</option>
+                    <option value="active">Активна</option>
+                    <option value="expired">Истекла</option>
+                    <option value="trial">Пробный период</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-500 ml-1">Тарифный план</label>
+                  <select 
+                    value={formData.subscription.plan}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      subscription: { ...formData.subscription, plan: e.target.value } 
+                    })}
+                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                  >
+                    <option value="none">Нет</option>
+                    <option value="monthly">Месячный</option>
+                    <option value="yearly">Годовой</option>
+                    <option value="trial">Пробный</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-500 ml-1">Действует до</label>
+                  <input 
+                    type="date" 
+                    value={formData.subscription.expiresAt ? new Date(formData.subscription.expiresAt).toISOString().split('T')[0] : ''}
+                    onChange={e => setFormData({ 
+                      ...formData, 
+                      subscription: { ...formData.subscription, expiresAt: e.target.value } 
+                    })}
+                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -2676,7 +2781,6 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'invoices' | 'prices' | 'settings'>('users');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedPrice, setSelectedPrice] = useState<any>(null);
-  const [selectedUserForSub, setSelectedUserForSub] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -3006,16 +3110,6 @@ const AdminDashboard = ({ user }: { user: User }) => {
           <PriceDetailModal 
             price={selectedPrice} 
             onClose={() => setSelectedPrice(null)} 
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {selectedUserForSub && (
-          <SubscriptionModal 
-            user={selectedUserForSub}
-            onClose={() => setSelectedUserForSub(null)}
-            onUpdate={fetchData}
           />
         )}
       </AnimatePresence>
@@ -3840,6 +3934,7 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [requestedTab, setRequestedTab] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -3909,6 +4004,7 @@ export default function App() {
         onLogout={handleLogout} 
         onOpenAuth={() => setIsAuthOpen(true)} 
         onOpenSettings={() => setRequestedTab('settings')}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
         onNotificationClick={(type) => {
           if (type === 'chat') setRequestedTab('chat');
           if (type === 'price_alert') setRequestedTab('prices');
@@ -3944,6 +4040,12 @@ export default function App() {
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
         onAuth={handleAuth} 
+      />
+
+      <FeedbackModal 
+        isOpen={isFeedbackOpen} 
+        onClose={() => setIsFeedbackOpen(false)} 
+        user={user}
       />
 
       {/* Footer */}
