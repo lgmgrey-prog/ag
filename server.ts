@@ -29,9 +29,7 @@ db.exec(`
     email TEXT,
     password TEXT,
     settings TEXT, -- JSON string
-    subscription TEXT, -- JSON string
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_login DATETIME
+    subscription TEXT -- JSON string
   );
 
   CREATE TABLE IF NOT EXISTS products (
@@ -144,24 +142,24 @@ function seedDatabase() {
   `);
 
   // Insert Admin
-  db.prepare("INSERT INTO users (inn, name, type, email, password, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
-    '0000000000', 'Admin', 'admin', 'lgm.grey@gmail.com', 'admin', new Date().toISOString()
+  db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '0000000000', 'Admin', 'admin', 'lgm.grey@gmail.com', 'admin'
   );
 
   // Insert Restaurant
-  db.prepare("INSERT INTO users (inn, name, type, email, password, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
-    '1234567890', 'Ресторан "Вкусный"', 'restaurant', 'rest@example.com', 'password', new Date().toISOString()
+  db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '1234567890', 'Ресторан "Вкусный"', 'restaurant', 'rest@example.com', 'password'
   );
 
   // Insert Suppliers
-  const s1 = db.prepare("INSERT INTO users (inn, name, type, email, password, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
-    '1111111111', 'Поставщик Овощей', 'supplier', 'sup1@example.com', 'password', new Date().toISOString()
+  const s1 = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '1111111111', 'Поставщик Овощей', 'supplier', 'sup1@example.com', 'password'
   );
-  const s2 = db.prepare("INSERT INTO users (inn, name, type, email, password, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
-    '2222222222', 'Мясной Двор', 'supplier', 'sup2@example.com', 'password', new Date().toISOString()
+  const s2 = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '2222222222', 'Мясной Двор', 'supplier', 'sup2@example.com', 'password'
   );
-  const s3 = db.prepare("INSERT INTO users (inn, name, type, email, password, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
-    '3333333333', 'Молочная Ферма', 'supplier', 'sup3@example.com', 'password', new Date().toISOString()
+  const s3 = db.prepare("INSERT INTO users (inn, name, type, email, password) VALUES (?, ?, ?, ?, ?)").run(
+    '3333333333', 'Молочная Ферма', 'supplier', 'sup3@example.com', 'password'
   );
 
   // Insert Products
@@ -182,9 +180,8 @@ function seedDatabase() {
 }
 
 // Check if we need to seed
-const testUser = db.prepare("SELECT * FROM users WHERE inn = ?").get('1234567890');
-if (!testUser || testUser.password !== 'password') {
-  console.log("Seeding database...");
+const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+if (userCount <= 1) {
   seedDatabase();
 }
 
@@ -195,14 +192,6 @@ try {
 
 try {
   db.prepare("ALTER TABLE users ADD COLUMN subscription TEXT").run();
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP").run();
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE users ADD COLUMN last_login DATETIME").run();
 } catch (e) {}
 
 // Email Transporter Setup
@@ -426,13 +415,8 @@ async function startServer() {
 
   app.post("/api/auth/login", (req, res) => {
     const { inn, password } = req.body;
-    console.log(`Login attempt for INN: ${inn}`);
     const user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(inn, password);
     if (user) {
-      console.log(`Login successful for user: ${user.name} (${user.type})`);
-      // Update last login
-      db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
-      
       if (user.settings) {
         user.settings = JSON.parse(user.settings);
       }
@@ -441,7 +425,6 @@ async function startServer() {
       }
       res.json(user);
     } else {
-      console.log(`Login failed for INN: ${inn}`);
       res.status(401).json({ error: "Неверный ИНН или пароль" });
     }
   });
@@ -874,39 +857,10 @@ async function startServer() {
     }
   });
 
-  // Admin: Get single user details
-  app.get("/api/admin/users/:id", (req, res) => {
-    const { id } = req.params;
-    try {
-      const user = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
-      if (!user) return res.status(404).json({ error: "User not found" });
-      
-      if (user.settings) user.settings = JSON.parse(user.settings);
-      if (user.subscription) user.subscription = JSON.parse(user.subscription);
-      
-      // Get additional stats
-      const orders = db.prepare("SELECT * FROM orders WHERE restaurant_id = ? OR supplier_id = ? ORDER BY created_at DESC LIMIT 10").all(id, id);
-      const invoices = db.prepare("SELECT * FROM invoices WHERE restaurant_id = ? OR supplier_id = ? ORDER BY created_at DESC LIMIT 10").all(id, id);
-      const messageCount = db.prepare("SELECT COUNT(*) as count FROM messages WHERE sender_id = ? OR receiver_id = ?").get(id, id).count;
-      
-      res.json({
-        ...user,
-        recentOrders: orders.map(o => ({ ...o, items: JSON.parse(o.items) })),
-        recentInvoices: invoices,
-        messageCount
-      });
-    } catch (err) {
-      res.status(500).json({ error: "Failed to fetch user details" });
-    }
-  });
-
   app.get("/api/admin/users", (req, res) => {
     try {
-      const users = db.prepare("SELECT id, inn, name, type, email, subscription, created_at, last_login FROM users").all();
-      res.json(users.map(u => ({
-        ...u,
-        subscription: u.subscription ? JSON.parse(u.subscription) : null
-      })));
+      const users = db.prepare("SELECT id, inn, name, type, email, subscription FROM users").all();
+      res.json(users);
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch users" });
     }
