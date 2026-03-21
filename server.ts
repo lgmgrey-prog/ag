@@ -262,8 +262,10 @@ function generateRobokassaUrl(invId: number, outSum: number, description: string
 }
 
 async function startServer() {
+  console.log("Initializing server...");
   const app = express();
   app.use(express.json({ limit: '10mb' }));
+  console.log("Express initialized");
 
   // Robokassa Result URL (Server-to-Server)
   app.post("/api/payments/robokassa/result", (req, res) => {
@@ -1175,13 +1177,19 @@ async function startServer() {
 
   // Vite middleware for development (MUST BE AT THE END)
   const isProd = process.env.NODE_ENV === "production";
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   if (!isProd) {
     console.log("Starting in DEVELOPMENT mode with Vite middleware");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+      console.log("Vite middleware attached");
+    } catch (viteError) {
+      console.error("Failed to start Vite server:", viteError);
+    }
   } else {
     console.log("Starting in PRODUCTION mode");
     app.use(express.static(path.join(__dirname, "dist")));
