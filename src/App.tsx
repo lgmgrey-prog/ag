@@ -453,6 +453,101 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
       </div>
     </section>
 
+    {/* About & Mission Section - Redesigned for elegance */}
+    <section className="py-32 bg-white overflow-hidden relative">
+      {/* Subtle background pattern */}
+      <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none">
+        <div className="absolute top-0 left-0 w-full h-full" style={{ backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div className="flex flex-col lg:flex-row gap-16 lg:items-center">
+          
+          {/* Image Side */}
+          <div className="lg:w-1/2 order-2 lg:order-1">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              className="relative"
+            >
+              <div className="aspect-[4/5] rounded-[3rem] overflow-hidden shadow-2xl relative z-10">
+                <img 
+                  src="https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&q=80&w=800&h=1000" 
+                  alt="Restaurant interior" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+              </div>
+              
+              {/* Floating Mission Card */}
+              <motion.div 
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 }}
+                viewport={{ once: true }}
+                className="absolute -bottom-10 -right-6 md:-right-12 z-20 bg-emerald-600 text-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl max-w-xs md:max-w-sm"
+              >
+                <p className="text-xs font-bold uppercase tracking-[0.2em] mb-4 opacity-80">Наша миссия</p>
+                <h3 className="text-xl md:text-2xl font-bold italic leading-tight">
+                  «Улучшать и совершенствовать работу предприятий питания»
+                </h3>
+              </motion.div>
+
+              {/* Decorative shapes */}
+              <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-100 rounded-full blur-3xl -z-10 opacity-60"></div>
+              <div className="absolute top-20 -right-10 w-24 h-24 border-4 border-emerald-500/20 rounded-full -z-10"></div>
+            </motion.div>
+          </div>
+
+          {/* Text Side */}
+          <div className="lg:w-1/2 order-1 lg:order-2">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="space-y-8"
+            >
+              <div className="space-y-4">
+                <div className="inline-block px-4 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest">
+                  О сервисе
+                </div>
+                <h2 className="text-4xl md:text-6xl font-bold text-zinc-900 tracking-tight leading-[1.1]">
+                  Ваш надежный <br />
+                  партнер в <span className="text-emerald-600">HoReCa</span>
+                </h2>
+              </div>
+
+              <div className="space-y-6 text-lg md:text-xl text-zinc-600 leading-relaxed font-light">
+                <p>
+                  <span className="font-bold text-zinc-900">Ресткост</span> — это инновационный сервис для сравнения цен на товары поставщиков horeca в вашем городе. 
+                </p>
+                <p>
+                  Ресторанам мы помогаем существенно <span className="text-zinc-900 font-medium underline decoration-emerald-500/30 underline-offset-4">сэкономить бюджет на закуп</span>, а поставщикам — найти новых лояльных клиентов.
+                </p>
+                <p>
+                  На нашей платформе собрана полная база поставщиков вашего региона. Это позволяет в реальном времени отслеживать актуальные предложения, контролировать рост цен и первыми узнавать о сезонных новинках.
+                </p>
+                
+                <div className="pt-6">
+                  <div className="flex items-center gap-4 p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
+                    <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center shrink-0 text-emerald-600">
+                      <Zap size={24} />
+                    </div>
+                    <p className="text-sm font-medium text-zinc-800">
+                      Избавьтесь от хаоса в мессенджерах. Объедините все коммуникации с поставщиками в одном удобном личном кабинете.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
     {/* Features */}
     <section className="py-32">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
