@@ -7,6 +7,8 @@ import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import axios from "axios";
 import crypto from "crypto";
+import { parse as parseCsv } from "csv-parse/sync";
+import xml2js from "xml2js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -230,6 +232,48 @@ async function sendWelcomeEmail(email: string, password: string) {
     });
   } catch (error) {
     console.error("Failed to send email:", error);
+  }
+}
+
+async function sendOrderNotification(supplierId: number, restaurantId: number, orderId: number, total: number) {
+  const settings = getSystemSettings();
+  if (!settings.smtp_user) return;
+
+  const supplier = db.prepare("SELECT * FROM users WHERE id = ?").get(supplierId) as any;
+  const restaurant = db.prepare("SELECT * FROM users WHERE id = ?").get(restaurantId) as any;
+  
+  if (!supplier || !supplier.email) return;
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: settings.smtp_host,
+      port: settings.smtp_port,
+      secure: settings.smtp_port === 465,
+      auth: {
+        user: settings.smtp_user,
+        pass: settings.smtp_pass,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"ProcureHub" <${settings.smtp_user}>`,
+      to: supplier.email,
+      subject: `Новый заказ #${orderId} от ${restaurant.name}`,
+      text: `У вас новый заказ от ${restaurant.name} на сумму ${total} руб. Проверьте личный кабинет.`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #10b981;">Новый заказ!</h2>
+          <p>Здравствуйте, <b>${supplier.name}</b>!</p>
+          <p>Вы получили новый заказ от ресторана <b>${restaurant.name}</b>.</p>
+          <p><b>Сумма заказа:</b> ${total} руб.</p>
+          <p>Пожалуйста, войдите в личный кабинет ProcureHub, чтобы просмотреть детали и подтвердить заказ.</p>
+          <br/>
+          <p style="color: #666; font-size: 12px;">Это автоматическое уведомление. Пожалуйста, не отвечайте на него.</p>
+        </div>
+      `
+    });
+  } catch (err) {
+    console.error("Failed to send order notification:", err);
   }
 }
 
@@ -1091,16 +1135,38 @@ async function startServer() {
   });
 
   // Orders API
-  app.post("/api/orders", (req, res) => {
+  app.post("/api/orders", async (req, res) => {
     const { restaurant_id, supplier_id, items, total } = req.body;
     try {
       const info = db.prepare(`
         INSERT INTO orders (restaurant_id, supplier_id, items, total)
         VALUES (?, ?, ?, ?)
       `).run(restaurant_id, supplier_id, JSON.stringify(items), total);
-      res.json({ id: info.lastInsertRowid, success: true });
+      
+      const orderId = Number(info.lastInsertRowid);
+      
+      // Send notification to supplier
+      await sendOrderNotification(supplier_id, restaurant_id, orderId, total);
+      
+      res.json({ id: orderId, success: true });
     } catch (err) {
       res.status(500).json({ error: "Failed to create order" });
+    }
+  });
+
+  app.get("/api/orders/restaurant/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      const orders = db.prepare(`
+        SELECT o.*, u.name as supplier
+        FROM orders o
+        JOIN users u ON o.supplier_id = u.id
+        WHERE o.restaurant_id = ?
+        ORDER BY o.created_at DESC
+      `).all(id);
+      res.json(orders.map(o => ({ ...o, items: JSON.parse(o.items) })));
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch restaurant orders" });
     }
   });
 
@@ -1117,6 +1183,114 @@ async function startServer() {
       res.json(orders.map(o => ({ ...o, items: JSON.parse(o.items) })));
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch supplier orders" });
+    }
+  });
+
+  // Product Import API
+  app.post("/api/products/import/csv", (req, res) => {
+    const { supplier_id, csv_data } = req.body;
+    try {
+      const records = parseCsv(csv_data, {
+        columns: true,
+        skip_empty_lines: true
+      });
+
+      const insertProduct = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)");
+      const insertPrice = db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)");
+
+      const transaction = db.transaction((items) => {
+        for (const item of items) {
+          // Check if product exists or create new
+          let product = db.prepare("SELECT id FROM products WHERE name = ? AND unit = ?").get(item.name, item.unit) as any;
+          let productId;
+          if (!product) {
+            const info = insertProduct.run(item.name, item.category, item.unit);
+            productId = info.lastInsertRowid;
+          } else {
+            productId = product.id;
+          }
+          // Add to price list
+          insertPrice.run(supplier_id, productId, parseFloat(item.price));
+        }
+      });
+
+      transaction(records);
+      res.json({ success: true, count: records.length });
+    } catch (err: any) {
+      res.status(500).json({ error: `Import failed: ${err.message}` });
+    }
+  });
+
+  app.post("/api/products/import/xml", async (req, res) => {
+    const { supplier_id, xml_data } = req.body;
+    try {
+      const parser = new xml2js.Parser({ explicitArray: false });
+      const result = await parser.parseStringPromise(xml_data);
+      const items = result.products.product;
+      const productList = Array.isArray(items) ? items : [items];
+
+      const insertProduct = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)");
+      const insertPrice = db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)");
+
+      const transaction = db.transaction((items) => {
+        for (const item of items) {
+          let product = db.prepare("SELECT id FROM products WHERE name = ? AND unit = ?").get(item.name, item.unit) as any;
+          let productId;
+          if (!product) {
+            const info = insertProduct.run(item.name, item.category, item.unit);
+            productId = info.lastInsertRowid;
+          } else {
+            productId = product.id;
+          }
+          insertPrice.run(supplier_id, productId, parseFloat(item.price));
+        }
+      });
+
+      transaction(productList);
+      res.json({ success: true, count: productList.length });
+    } catch (err: any) {
+      res.status(500).json({ error: `Import failed: ${err.message}` });
+    }
+  });
+
+  app.post("/api/products/import/google-sheets", async (req, res) => {
+    const { supplier_id, sheet_url } = req.body;
+    try {
+      // Extract sheet ID from URL
+      const match = sheet_url.match(/\/d\/(.*?)(\/|$)/);
+      if (!match) return res.status(400).json({ error: "Invalid Google Sheets URL" });
+      const sheetId = match[1];
+      const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+
+      const response = await axios.get(exportUrl);
+      const csvData = response.data;
+
+      const records = parseCsv(csvData, {
+        columns: true,
+        skip_empty_lines: true
+      });
+
+      const insertProduct = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)");
+      const insertPrice = db.prepare("INSERT INTO price_lists (supplier_id, product_id, price) VALUES (?, ?, ?)");
+
+      const transaction = db.transaction((items) => {
+        for (const item of items) {
+          let product = db.prepare("SELECT id FROM products WHERE name = ? AND unit = ?").get(item.name, item.unit) as any;
+          let productId;
+          if (!product) {
+            const info = insertProduct.run(item.name, item.category, item.unit);
+            productId = info.lastInsertRowid;
+          } else {
+            productId = product.id;
+          }
+          insertPrice.run(supplier_id, productId, parseFloat(item.price));
+        }
+      });
+
+      transaction(records);
+      res.json({ success: true, count: records.length });
+    } catch (err: any) {
+      res.status(500).json({ error: `Import failed: ${err.message}` });
     }
   });
 
