@@ -38,7 +38,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
+    name TEXT UNIQUE,
     category TEXT,
     unit TEXT
   );
@@ -50,7 +50,8 @@ db.exec(`
     price REAL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(supplier_id) REFERENCES users(id),
-    FOREIGN KEY(product_id) REFERENCES products(id)
+    FOREIGN KEY(product_id) REFERENCES products(id),
+    UNIQUE(supplier_id, product_id)
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -104,11 +105,14 @@ db.exec(`
     smtp_port INTEGER,
     smtp_user TEXT,
     smtp_pass TEXT,
-    base_url TEXT
+    base_url TEXT,
+    google_client_id TEXT,
+    google_client_secret TEXT,
+    google_redirect_uri TEXT
   );
 
-  INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url)
-  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', '${process.env.APP_URL || ''}');
+  INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url, google_client_id, google_client_secret, google_redirect_uri)
+  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', '', '', '', '');
 `);
 
 // Helper to get system settings
@@ -124,7 +128,10 @@ function getSystemSettings() {
     smtp_port: settings?.smtp_port || parseInt(process.env.SMTP_PORT || "587"),
     smtp_user: settings?.smtp_user || process.env.SMTP_USER || "",
     smtp_pass: settings?.smtp_pass || process.env.SMTP_PASS || "",
-    base_url: settings?.base_url || process.env.APP_URL || ""
+    base_url: settings?.base_url || process.env.APP_URL || "",
+    google_client_id: settings?.google_client_id || process.env.GOOGLE_CLIENT_ID || "",
+    google_client_secret: settings?.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "",
+    google_redirect_uri: settings?.google_redirect_uri || process.env.GOOGLE_REDIRECT_URI || ""
   };
 }
 
@@ -202,6 +209,22 @@ try {
   db.prepare("ALTER TABLE users ADD COLUMN last_login DATETIME").run();
 } catch (e) {}
 
+try {
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_product ON price_lists(supplier_id, product_id)");
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN google_client_id TEXT").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN google_client_secret TEXT").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN google_redirect_uri TEXT").run();
+} catch (e) {}
+
 // Email Transporter Setup
 // Transporter is created dynamically in sendWelcomeEmail using system settings
 
@@ -270,14 +293,18 @@ async function startServer() {
     sameSite: 'none'
   }));
 
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || `${process.env.APP_URL}/auth/google/callback`
-  );
+  const getOAuth2Client = () => {
+    const settings = getSystemSettings();
+    return new google.auth.OAuth2(
+      settings.google_client_id,
+      settings.google_client_secret,
+      settings.google_redirect_uri || `${settings.base_url}/auth/google/callback`
+    );
+  };
 
   // Google Auth Routes
   app.get("/api/auth/google/url", (req, res) => {
+    const oauth2Client = getOAuth2Client();
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: [
@@ -291,6 +318,7 @@ async function startServer() {
 
   app.get("/auth/google/callback", async (req, res) => {
     const { code } = req.query;
+    const oauth2Client = getOAuth2Client();
     try {
       const { tokens } = await oauth2Client.getToken(code as string);
       req.session!.tokens = tokens;
@@ -319,6 +347,7 @@ async function startServer() {
   app.get("/api/google/sheets", async (req, res) => {
     if (!req.session?.tokens) return res.status(401).json({ error: "Not authenticated with Google" });
     
+    const oauth2Client = getOAuth2Client();
     oauth2Client.setCredentials(req.session.tokens);
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
     
@@ -337,6 +366,7 @@ async function startServer() {
     if (!req.session?.tokens) return res.status(401).json({ error: "Not authenticated with Google" });
     
     const { spreadsheetId } = req.params;
+    const oauth2Client = getOAuth2Client();
     oauth2Client.setCredentials(req.session.tokens);
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
     
@@ -366,11 +396,6 @@ async function startServer() {
         price = excluded.price,
         updated_at = CURRENT_TIMESTAMP
       `);
-
-      // Ensure the unique constraint exists for ON CONFLICT
-      try {
-        db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_product ON price_lists(supplier_id, product_id)");
-      } catch (e) {}
 
       const transaction = db.transaction((items) => {
         for (const item of items) {
@@ -968,7 +993,8 @@ async function startServer() {
   app.post("/api/admin/settings", (req, res) => {
     const { 
       robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, 
-      datanewton_api_key, smtp_host, smtp_port, smtp_user, smtp_pass, base_url 
+      datanewton_api_key, smtp_host, smtp_port, smtp_user, smtp_pass, base_url,
+      google_client_id, google_client_secret, google_redirect_uri
     } = req.body;
 
     try {
@@ -983,7 +1009,10 @@ async function startServer() {
           smtp_port = ?,
           smtp_user = ?,
           smtp_pass = ?,
-          base_url = ?
+          base_url = ?,
+          google_client_id = ?,
+          google_client_secret = ?,
+          google_redirect_uri = ?
         WHERE id = 1
       `).run(
         robokassa_login, 
@@ -995,7 +1024,10 @@ async function startServer() {
         smtp_port,
         smtp_user,
         smtp_pass,
-        base_url
+        base_url,
+        google_client_id,
+        google_client_secret,
+        google_redirect_uri
       );
       res.json({ success: true });
     } catch (err) {

@@ -2498,6 +2498,49 @@ const SystemSettingsView = () => {
 
           <div className="h-px bg-zinc-100" />
 
+          {/* Google API Settings */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+              <FileSpreadsheet size={20} className="text-emerald-500" />
+              Google API (Sheets & Drive)
+            </h3>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Client ID</label>
+                <input 
+                  type="text" 
+                  value={settings.google_client_id || ''}
+                  onChange={e => setSettings({...settings, google_client_id: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  placeholder="Введите Google Client ID"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Client Secret</label>
+                <input 
+                  type="password" 
+                  value={settings.google_client_secret || ''}
+                  onChange={e => setSettings({...settings, google_client_secret: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  placeholder="Введите Google Client Secret"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Redirect URI</label>
+                <input 
+                  type="text" 
+                  value={settings.google_redirect_uri || ''}
+                  onChange={e => setSettings({...settings, google_redirect_uri: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  placeholder={`${settings.base_url}/auth/google/callback`}
+                />
+                <p className="text-[10px] text-zinc-400">Оставьте пустым для использования значения по умолчанию: {settings.base_url}/auth/google/callback</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-px bg-zinc-100" />
+
           {/* SMTP Settings */}
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
