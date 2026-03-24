@@ -1,17 +1,36 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-// @ts-ignore
-const apiKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || 
-               // @ts-ignore
-               (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || 
-               "";
+let cachedApiKey: string | null = null;
+
+async function getApiKey() {
+  if (cachedApiKey) return cachedApiKey;
+
+  // @ts-ignore
+  const envKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || 
+                 // @ts-ignore
+                 (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY);
+  
+  if (envKey) {
+    cachedApiKey = envKey;
+    return envKey;
+  }
+
+  try {
+    const res = await fetch('/api/config/public');
+    const data = await res.json();
+    if (data.gemini_api_key) {
+      cachedApiKey = data.gemini_api_key;
+      return data.gemini_api_key;
+    }
+  } catch (e) {
+    console.error("Failed to fetch public config:", e);
+  }
+
+  return "";
+}
 
 export async function analyzePrices(matrix: any[], marketPrices: any[]) {
-  // @ts-ignore
-  const apiKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || 
-                 // @ts-ignore
-                 (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || 
-                 "";
+  const apiKey = await getApiKey();
 
   if (!apiKey) {
     console.warn("Gemini API key is not set. Returning mock analysis.");
@@ -80,11 +99,7 @@ export async function analyzePrices(matrix: any[], marketPrices: any[]) {
 }
 
 export async function recognizeInvoice(base64Image: string) {
-  // @ts-ignore
-  const apiKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || 
-                 // @ts-ignore
-                 (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || 
-                 "";
+  const apiKey = await getApiKey();
 
   if (!apiKey) {
     console.warn("Gemini API key is not set. Returning mock recognition.");

@@ -2404,6 +2404,17 @@ const SystemSettingsView = () => {
               />
               <p className="text-[10px] text-zinc-400">Этот URL используется для формирования ссылок возврата Robokassa и других системных уведомлений.</p>
             </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Session Secret</label>
+              <input 
+                type="password" 
+                value={settings.session_secret}
+                onChange={e => setSettings({...settings, session_secret: e.target.value})}
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                placeholder="Введите секретный ключ для сессий"
+              />
+              <p className="text-[10px] text-zinc-400">Используется для подписи кук сессии. Изменение этого ключа приведет к выходу всех пользователей из системы.</p>
+            </div>
           </div>
 
           <div className="h-px bg-zinc-100" />
@@ -2493,6 +2504,27 @@ const SystemSettingsView = () => {
                 className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                 placeholder="Введите ваш API ключ Datanewton"
               />
+            </div>
+          </div>
+
+          <div className="h-px bg-zinc-100" />
+
+          {/* Gemini API Settings */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+              <Zap size={20} className="text-blue-500" />
+              Gemini AI API
+            </h3>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Gemini API Key</label>
+              <input 
+                type="password" 
+                value={settings.gemini_api_key || ''}
+                onChange={e => setSettings({...settings, gemini_api_key: e.target.value})}
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                placeholder="Введите ваш Gemini API ключ"
+              />
+              <p className="text-[10px] text-zinc-400">Используется для анализа цен и распознавания накладных.</p>
             </div>
           </div>
 

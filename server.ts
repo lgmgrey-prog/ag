@@ -15,12 +15,6 @@ const __dirname = path.dirname(__filename);
 
 const db = new Database("procurehub.db");
 
-// Robokassa Config
-const ROBOKASSA_LOGIN = process.env.ROBOKASSA_LOGIN || "test_merchant";
-const ROBOKASSA_PASS1 = process.env.ROBOKASSA_PASS1 || "pass1";
-const ROBOKASSA_PASS2 = process.env.ROBOKASSA_PASS2 || "pass2";
-const IS_TEST = process.env.ROBOKASSA_TEST === "true";
-
 // Initialize database
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -108,12 +102,53 @@ db.exec(`
     base_url TEXT,
     google_client_id TEXT,
     google_client_secret TEXT,
-    google_redirect_uri TEXT
+    google_redirect_uri TEXT,
+    session_secret TEXT,
+    gemini_api_key TEXT
   );
-
-  INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url, google_client_id, google_client_secret, google_redirect_uri)
-  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', '', '', '', '');
 `);
+
+// Migration: Add columns if they don't exist
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN gemini_api_key TEXT").run();
+} catch (e) {}
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN session_secret TEXT").run();
+} catch (e) {}
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN base_url TEXT").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN subscription TEXT").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN last_login DATETIME").run();
+} catch (e) {}
+
+try {
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_product ON price_lists(supplier_id, product_id)");
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN google_client_id TEXT").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN google_client_secret TEXT").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN google_redirect_uri TEXT").run();
+} catch (e) {}
+
+// Initial settings insert (AFTER migrations to ensure columns exist)
+db.exec(`
+  INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url, google_client_id, google_client_secret, google_redirect_uri, session_secret, gemini_api_key)
+  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', '', '', '', '', 'secret-key', '');
+`);
+
 
 // Helper to get system settings
 function getSystemSettings() {
@@ -131,7 +166,9 @@ function getSystemSettings() {
     base_url: settings?.base_url || process.env.APP_URL || "",
     google_client_id: settings?.google_client_id || process.env.GOOGLE_CLIENT_ID || "",
     google_client_secret: settings?.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "",
-    google_redirect_uri: settings?.google_redirect_uri || process.env.GOOGLE_REDIRECT_URI || ""
+    google_redirect_uri: settings?.google_redirect_uri || process.env.GOOGLE_REDIRECT_URI || "",
+    session_secret: settings?.session_secret || process.env.SESSION_SECRET || "secret-key",
+    gemini_api_key: settings?.gemini_api_key || process.env.GEMINI_API_KEY || ""
   };
 }
 
@@ -192,38 +229,9 @@ function seedDatabase() {
 
 // Check if we need to seed
 const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
-if (userCount <= 1) {
+if (userCount === 0) {
   seedDatabase();
 }
-
-// Migration: Add columns if they don't exist
-try {
-  db.prepare("ALTER TABLE system_settings ADD COLUMN base_url TEXT").run();
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE users ADD COLUMN subscription TEXT").run();
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE users ADD COLUMN last_login DATETIME").run();
-} catch (e) {}
-
-try {
-  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_product ON price_lists(supplier_id, product_id)");
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE system_settings ADD COLUMN google_client_id TEXT").run();
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE system_settings ADD COLUMN google_client_secret TEXT").run();
-} catch (e) {}
-
-try {
-  db.prepare("ALTER TABLE system_settings ADD COLUMN google_redirect_uri TEXT").run();
-} catch (e) {}
 
 // Email Transporter Setup
 // Transporter is created dynamically in sendWelcomeEmail using system settings
@@ -287,7 +295,7 @@ async function startServer() {
 
   app.use(cookieSession({
     name: 'session',
-    keys: [process.env.SESSION_SECRET || 'secret-key'],
+    keys: [getSystemSettings().session_secret],
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     secure: true,
     sameSite: 'none'
@@ -456,6 +464,14 @@ async function startServer() {
   });
 
   const PORT = 3000;
+
+  app.get("/api/config/public", (req, res) => {
+    const settings = getSystemSettings();
+    res.json({
+      base_url: settings.base_url,
+      gemini_api_key: settings.gemini_api_key
+    });
+  });
 
   // API Routes
   app.get("/api/health", (req, res) => {
@@ -994,7 +1010,7 @@ async function startServer() {
     const { 
       robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, 
       datanewton_api_key, smtp_host, smtp_port, smtp_user, smtp_pass, base_url,
-      google_client_id, google_client_secret, google_redirect_uri
+      google_client_id, google_client_secret, google_redirect_uri, session_secret, gemini_api_key
     } = req.body;
 
     try {
@@ -1012,7 +1028,9 @@ async function startServer() {
           base_url = ?,
           google_client_id = ?,
           google_client_secret = ?,
-          google_redirect_uri = ?
+          google_redirect_uri = ?,
+          session_secret = ?,
+          gemini_api_key = ?
         WHERE id = 1
       `).run(
         robokassa_login, 
@@ -1027,7 +1045,9 @@ async function startServer() {
         base_url,
         google_client_id,
         google_client_secret,
-        google_redirect_uri
+        google_redirect_uri,
+        session_secret,
+        gemini_api_key
       );
       res.json({ success: true });
     } catch (err) {
