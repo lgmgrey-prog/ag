@@ -36,11 +36,14 @@ import {
   Lock,
   CreditCard,
   Mail,
-  Save
+  Save,
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
 import { analyzePrices, recognizeInvoice } from './services/geminiService';
+import { SupplierImport } from './components/SupplierImport';
 
 const Toast = ({ message, type = 'success', onClose }: { message: string, type?: 'success' | 'error', onClose: () => void }) => {
   useEffect(() => {
@@ -3123,7 +3126,7 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
   onTabHandled?: () => void,
   showToast?: (m: string, t?: 'success' | 'error') => void
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat' | 'import'>('dashboard');
   const [integration, setIntegration] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [config1c, setConfig1c] = useState({ serverUrl: '', login: '', password: '' });
@@ -3269,6 +3272,7 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
               { id: 'prices', label: 'Прайс-листы', icon: Package },
               { id: 'chat', label: 'Чат', icon: MessageSquare },
               { id: 'orders', label: 'Заказы', icon: FileText },
+              { id: 'import', label: 'Импорт', icon: Download },
               { id: 'integrations', label: 'Интеграция 1С', icon: Zap },
               { id: 'settings', label: 'Настройки', icon: Settings },
             ].map((tab) => (
@@ -3468,6 +3472,17 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
             exit={{ opacity: 0, x: -20 }}
           >
             <ChatWindow user={user} />
+          </motion.div>
+        )}
+
+        {activeTab === 'import' && (
+          <motion.div 
+            key="import"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <SupplierImport user={user} showToast={showToast!} onImportSuccess={fetchPrices} />
           </motion.div>
         )}
 

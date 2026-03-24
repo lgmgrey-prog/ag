@@ -7,6 +7,8 @@ import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import axios from "axios";
 import crypto from "crypto";
+import { google } from "googleapis";
+import cookieSession from "cookie-session";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -259,6 +261,134 @@ function generateRobokassaUrl(invId: number, outSum: number, description: string
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '10mb' }));
+
+  app.use(cookieSession({
+    name: 'session',
+    keys: [process.env.SESSION_SECRET || 'secret-key'],
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    secure: true,
+    sameSite: 'none'
+  }));
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI || `${process.env.APP_URL}/auth/google/callback`
+  );
+
+  // Google Auth Routes
+  app.get("/api/auth/google/url", (req, res) => {
+    const url = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: [
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+        'https://www.googleapis.com/auth/drive.metadata.readonly'
+      ],
+      prompt: 'consent'
+    });
+    res.json({ url });
+  });
+
+  app.get("/auth/google/callback", async (req, res) => {
+    const { code } = req.query;
+    try {
+      const { tokens } = await oauth2Client.getToken(code as string);
+      req.session!.tokens = tokens;
+      res.send(`
+        <html>
+          <body>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
+                window.close();
+              } else {
+                window.location.href = '/';
+              }
+            </script>
+            <p>Authentication successful. This window should close automatically.</p>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Google Auth Error:", error);
+      res.status(500).send("Authentication failed");
+    }
+  });
+
+  // Google Sheets API
+  app.get("/api/google/sheets", async (req, res) => {
+    if (!req.session?.tokens) return res.status(401).json({ error: "Not authenticated with Google" });
+    
+    oauth2Client.setCredentials(req.session.tokens);
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    
+    try {
+      const response = await drive.files.list({
+        q: "mimeType='application/vnd.google-apps.spreadsheet'",
+        fields: 'files(id, name)',
+      });
+      res.json(response.data.files);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch spreadsheets" });
+    }
+  });
+
+  app.get("/api/google/sheets/:spreadsheetId", async (req, res) => {
+    if (!req.session?.tokens) return res.status(401).json({ error: "Not authenticated with Google" });
+    
+    const { spreadsheetId } = req.params;
+    oauth2Client.setCredentials(req.session.tokens);
+    const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+    
+    try {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId });
+      const sheetName = meta.data.sheets?.[0].properties?.title;
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!A1:Z100`,
+      });
+      res.json({ values: response.data.values, sheetName });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sheet data" });
+    }
+  });
+
+  app.post("/api/supplier/import", async (req, res) => {
+    const { supplier_id, products } = req.body;
+    try {
+      const insertProduct = db.prepare("INSERT OR IGNORE INTO products (name, category, unit) VALUES (?, ?, ?)");
+      const getProduct = db.prepare("SELECT id FROM products WHERE name = ?");
+      const upsertPrice = db.prepare(`
+        INSERT INTO price_lists (supplier_id, product_id, price, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(supplier_id, product_id) DO UPDATE SET
+        price = excluded.price,
+        updated_at = CURRENT_TIMESTAMP
+      `);
+
+      // Ensure the unique constraint exists for ON CONFLICT
+      try {
+        db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_product ON price_lists(supplier_id, product_id)");
+      } catch (e) {}
+
+      const transaction = db.transaction((items) => {
+        for (const item of items) {
+          insertProduct.run(item.name, item.category || 'Общее', item.unit || 'кг');
+          const product = getProduct.get(item.name) as any;
+          if (product) {
+            upsertPrice.run(supplier_id, product.id, item.price);
+          }
+        }
+      });
+
+      transaction(products);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Import error:", error);
+      res.status(500).json({ error: "Failed to import products" });
+    }
+  });
 
   // Robokassa Result URL (Server-to-Server)
   app.post("/api/payments/robokassa/result", (req, res) => {
