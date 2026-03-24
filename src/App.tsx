@@ -1905,25 +1905,11 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'invoices' | 'integrations' | 'cart' | 'suppliers' | 'orders' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'invoices' | 'integrations' | 'cart' | 'suppliers' | 'settings'>('dashboard');
   const [selectedPrice, setSelectedPrice] = useState<PriceRecord | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
   const [chatTargetId, setChatTargetId] = useState<number | null>(null);
-  const [orders, setOrders] = useState<any[]>([]);
-
-  const fetchOrders = () => {
-    fetch(`/api/orders/restaurant/${user.id}`)
-      .then(res => res.json())
-      .then(setOrders)
-      .catch(err => console.error('Error fetching orders:', err));
-  };
-
-  useEffect(() => {
-    if (activeTab === 'orders') {
-      fetchOrders();
-    }
-  }, [activeTab]);
 
   useEffect(() => {
     if (requestedTab) {
@@ -2031,7 +2017,6 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
           <nav className="flex flex-wrap gap-2">
             {[
               { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
-              { id: 'orders', label: 'Заказы', icon: ShoppingCart },
               { id: 'suppliers', label: 'Поставщики', icon: Users },
               { id: 'chat', label: 'Чат', icon: MessageSquare },
               { id: 'invoices', label: 'Бухгалтерия', icon: FileText },
@@ -3132,76 +3117,13 @@ const AdminDashboard = ({ user }: { user: User }) => {
   );
 };
 
-const ImportCard = ({ title, description, icon, onImport, isUrl, placeholder }: { 
-  title: string, 
-  description: string, 
-  icon: React.ReactNode, 
-  onImport: (data: string) => void,
-  isUrl?: boolean,
-  placeholder?: string
-}) => {
-  const [data, setData] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!data.trim()) return;
-    setIsImporting(true);
-    try {
-      await onImport(data);
-      setData('');
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  return (
-    <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm hover:border-emerald-300 transition-all">
-      <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 mb-4">
-        {icon}
-      </div>
-      <h3 className="font-bold text-zinc-900 mb-1">{title}</h3>
-      <p className="text-xs text-zinc-500 mb-6">{description}</p>
-      
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {isUrl ? (
-          <input 
-            type="url"
-            value={data}
-            onChange={e => setData(e.target.value)}
-            placeholder={placeholder}
-            className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-            required
-          />
-        ) : (
-          <textarea 
-            value={data}
-            onChange={e => setData(e.target.value)}
-            placeholder={placeholder}
-            rows={3}
-            className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"
-            required
-          />
-        )}
-        <button 
-          type="submit"
-          disabled={isImporting}
-          className="w-full bg-zinc-900 text-white py-2 rounded-xl text-xs font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
-        >
-          {isImporting ? 'Загрузка...' : 'Импортировать'}
-        </button>
-      </form>
-    </div>
-  );
-};
-
 const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: { 
   user: User, 
   requestedTab?: string | null, 
   onTabHandled?: () => void,
   showToast?: (m: string, t?: 'success' | 'error') => void
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat' | 'import'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat'>('dashboard');
   const [integration, setIntegration] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [config1c, setConfig1c] = useState({ serverUrl: '', login: '', password: '' });
@@ -3316,34 +3238,6 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
     fetchStats();
   };
 
-  const handleImport = async (type: 'csv' | 'xml' | 'google-sheets', data: string) => {
-    try {
-      const body: any = { supplier_id: user.id };
-      if (type === 'csv') body.csv_data = data;
-      else if (type === 'xml') body.xml_data = data;
-      else if (type === 'google-sheets') body.sheet_url = data;
-
-      const res = await fetch(`/api/products/import/${type}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        showToast?.(`Импорт завершен! Загружено товаров: ${result.count}`);
-        fetchPrices();
-        setActiveTab('prices');
-      } else {
-        const error = await res.json();
-        showToast?.(`Ошибка импорта: ${error.error}`, 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast?.('Ошибка при выполнении импорта', 'error');
-    }
-  };
-
   const deletePrice = async (id: number) => {
     setConfirmData({
       isOpen: true,
@@ -3373,7 +3267,6 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
             {[
               { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
               { id: 'prices', label: 'Прайс-листы', icon: Package },
-              { id: 'import', label: 'Импорт', icon: Upload },
               { id: 'chat', label: 'Чат', icon: MessageSquare },
               { id: 'orders', label: 'Заказы', icon: FileText },
               { id: 'integrations', label: 'Интеграция 1С', icon: Zap },
@@ -3575,90 +3468,6 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
             exit={{ opacity: 0, x: -20 }}
           >
             <ChatWindow user={user} />
-          </motion.div>
-        )}
-
-        {activeTab === 'import' && (
-          <motion.div 
-            key="import"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="max-w-4xl mx-auto space-y-8"
-          >
-            <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
-              <h2 className="text-2xl font-bold text-zinc-900 mb-6">Импорт товаров</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <ImportCard 
-                  title="CSV Импорт" 
-                  description="Загрузите файл .csv с вашим прайс-листом"
-                  icon={<FileText size={24} />}
-                  onImport={(data) => handleImport('csv', data)}
-                  placeholder="name,category,unit,price\nТоматы,Овощи,кг,150"
-                />
-                <ImportCard 
-                  title="XML Импорт" 
-                  description="Загрузите XML структуру ваших товаров"
-                  icon={<Database size={24} />}
-                  onImport={(data) => handleImport('xml', data)}
-                  placeholder="<products><product><name>Томаты</name>...</product></products>"
-                />
-                <ImportCard 
-                  title="Google Sheets" 
-                  description="Синхронизация по ссылке на таблицу"
-                  icon={<Link size={24} />}
-                  onImport={(data) => handleImport('google-sheets', data)}
-                  isUrl
-                  placeholder="https://docs.google.com/spreadsheets/d/..."
-                />
-              </div>
-
-              <div className="mt-12 p-6 bg-zinc-50 rounded-2xl border border-zinc-100">
-                <h3 className="font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                  <HelpCircle size={18} className="text-emerald-600" />
-                  Демо-контент для Google Таблиц
-                </h3>
-                <p className="text-sm text-zinc-500 mb-4">
-                  Для тестирования импорта создайте Google Таблицу, добавьте в нее следующие данные и сделайте ее доступной по ссылке (Доступ ограничен {"->"} Все, у кого есть ссылка).
-                </p>
-                <div className="bg-white p-4 rounded-xl border border-zinc-200 font-mono text-xs overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-zinc-100">
-                        <th className="pb-2 pr-4">name</th>
-                        <th className="pb-2 pr-4">category</th>
-                        <th className="pb-2 pr-4">unit</th>
-                        <th className="pb-2 pr-4">price</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="py-2 pr-4">Томаты Черри</td>
-                        <td className="py-2 pr-4">Овощи</td>
-                        <td className="py-2 pr-4">кг</td>
-                        <td className="py-2 pr-4">250</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2 pr-4">Огурцы короткоплодные</td>
-                        <td className="py-2 pr-4">Овощи</td>
-                        <td className="py-2 pr-4">кг</td>
-                        <td className="py-2 pr-4">180</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2 pr-4">Сыр Пармезан</td>
-                        <td className="py-2 pr-4">Молочные продукты</td>
-                        <td className="py-2 pr-4">кг</td>
-                        <td className="py-2 pr-4">1200</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-xs text-zinc-400 mt-4 italic">
-                  * Первая строка должна содержать заголовки: name, category, unit, price
-                </p>
-              </div>
-            </div>
           </motion.div>
         )}
 
