@@ -470,6 +470,15 @@ async function startServer() {
     }
   });
 
+  app.get("/api/products", (req, res) => {
+    try {
+      const products = db.prepare("SELECT * FROM products ORDER BY name").all();
+      res.json(products);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
   app.post("/api/supplier/import", async (req, res) => {
     const { supplier_id, products } = req.body;
     try {

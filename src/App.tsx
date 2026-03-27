@@ -1557,7 +1557,7 @@ const InvoicesView = ({ user }: { user: User }) => {
   );
 };
 
-const IntegrationsView = ({ user }: { user: User }) => {
+const IntegrationsView = ({ user, onSyncSuccess }: { user: User, onSyncSuccess?: () => void }) => {
   const [integration, setIntegration] = useState<any>(null);
   const [apiLogin, setApiLogin] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1607,6 +1607,7 @@ const IntegrationsView = ({ user }: { user: User }) => {
       const data = await res.json();
       if (data.success) {
         setMessage({ type: 'success', text: `Синхронизация завершена. Загружено товаров: ${data.count}` });
+        onSyncSuccess?.();
         // Refresh integration info to show last sync
         fetch(`/api/integrations/${user.id}`)
           .then(res => res.json())
@@ -1644,9 +1645,19 @@ const IntegrationsView = ({ user }: { user: User }) => {
           </div>
 
           {message && (
-            <div className={`p-4 rounded-xl mb-6 flex items-center gap-3 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-              {message.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-              <p className="text-sm font-medium">{message.text}</p>
+            <div className={`p-4 rounded-xl mb-6 flex flex-col gap-3 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+              <div className="flex items-center gap-3">
+                {message.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+                <p className="text-sm font-medium">{message.text}</p>
+              </div>
+              {message.type === 'success' && onSyncSuccess && (
+                <button 
+                  onClick={onSyncSuccess}
+                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 ml-8"
+                >
+                  Перейти в каталог <ArrowRight size={14} />
+                </button>
+              )}
             </div>
           )}
 
@@ -1706,6 +1717,87 @@ const IntegrationsView = ({ user }: { user: User }) => {
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+const CatalogView = () => {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => {
+        setProducts(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+      <div className="p-6 border-b border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-zinc-900">Каталог товаров</h2>
+          <p className="text-sm text-zinc-500">Все товары, синхронизированные из iiko и других систем</p>
+        </div>
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+          <input 
+            type="text" 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Поиск по названию или категории..." 
+            className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+          />
+        </div>
+      </div>
+      
+      {loading ? (
+        <div className="p-20 text-center">
+          <RefreshCw className="animate-spin mx-auto text-emerald-600 mb-4" size={32} />
+          <p className="text-zinc-500 font-medium">Загрузка каталога...</p>
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="p-20 text-center">
+          <Package size={64} className="mx-auto text-zinc-100 mb-6" />
+          <p className="text-zinc-400 font-medium">Товары не найдены</p>
+          <p className="text-sm text-zinc-300 mt-2">Попробуйте изменить поисковый запрос или синхронизируйте iiko</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                <th className="px-8 py-5">Название</th>
+                <th className="px-8 py-5">Категория</th>
+                <th className="px-8 py-5">Ед. изм.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {filteredProducts.map((p, i) => (
+                <tr key={i} className="hover:bg-zinc-50 transition-colors">
+                  <td className="px-8 py-5 font-bold text-zinc-900">{p.name}</td>
+                  <td className="px-8 py-5">
+                    <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">{p.category}</span>
+                  </td>
+                  <td className="px-8 py-5 text-sm text-zinc-500">{p.unit}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
@@ -2007,7 +2099,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'invoices' | 'integrations' | 'cart' | 'suppliers' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'invoices' | 'integrations' | 'cart' | 'suppliers' | 'settings' | 'catalog'>('dashboard');
   const [selectedPrice, setSelectedPrice] = useState<PriceRecord | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
@@ -2119,6 +2211,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
           <nav className="flex flex-wrap gap-2">
             {[
               { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
+              { id: 'catalog', label: 'Каталог', icon: Package },
               { id: 'suppliers', label: 'Поставщики', icon: Users },
               { id: 'chat', label: 'Чат', icon: MessageSquare },
               { id: 'invoices', label: 'Бухгалтерия', icon: FileText },
@@ -2352,7 +2445,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
           >
-            <IntegrationsView user={user} />
+            <IntegrationsView user={user} onSyncSuccess={() => setActiveTab('catalog')} />
           </motion.div>
         )}
 
@@ -2392,6 +2485,16 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             ) : (
               <SuppliersView onSelectSupplier={setSelectedSupplierId} />
             )}
+          </motion.div>
+        )}
+        {activeTab === 'catalog' && (
+          <motion.div
+            key="catalog"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <CatalogView />
           </motion.div>
         )}
         {activeTab === 'settings' && (
