@@ -123,6 +123,16 @@ db.exec(`
     body TEXT,
     description TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS email_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipient TEXT,
+    template_id TEXT,
+    subject TEXT,
+    status TEXT, -- 'success' or 'error'
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Migration: Add columns if they don't exist
@@ -325,8 +335,15 @@ async function sendEmail(to: string, templateId: string, variables: Record<strin
       subject: subject,
       html: body,
     });
-  } catch (error) {
+
+    db.prepare("INSERT INTO email_logs (recipient, template_id, subject, status) VALUES (?, ?, ?, ?)").run(
+      to, templateId, subject, 'success'
+    );
+  } catch (error: any) {
     console.error("Failed to send email:", error);
+    db.prepare("INSERT INTO email_logs (recipient, template_id, subject, status, error_message) VALUES (?, ?, ?, ?, ?)").run(
+      to, templateId, subject, 'error', error.message || String(error)
+    );
   }
 }
 
@@ -687,6 +704,24 @@ async function startServer() {
         inn: inn
       });
       res.status(500).json({ error: "Ошибка при получении данных об организации" });
+    }
+  });
+
+  app.get("/api/admin/email-logs", (req, res) => {
+    try {
+      const logs = db.prepare("SELECT * FROM email_logs ORDER BY created_at DESC LIMIT 100").all();
+      res.json(logs);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch email logs" });
+    }
+  });
+
+  app.post("/api/admin/email-logs/clear", (req, res) => {
+    try {
+      db.prepare("DELETE FROM email_logs").run();
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to clear email logs" });
     }
   });
 

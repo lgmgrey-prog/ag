@@ -15,6 +15,7 @@ import {
   Plus, 
   ChevronRight,
   ChevronLeft,
+  Check,
   ArrowRight,
   CheckCircle2,
   AlertCircle,
@@ -2615,8 +2616,10 @@ const SystemSettingsView = () => {
   const [templates, setTemplates] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'payments' | 'api' | 'email'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'payments' | 'api' | 'email' | 'logs'>('general');
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+  const [emailLogs, setEmailLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   const toggleSecret = (key: string) => {
     setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }));
@@ -2630,6 +2633,36 @@ const SystemSettingsView = () => {
       .then(res => res.json())
       .then(setTemplates);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'logs') {
+      fetchLogs();
+    }
+  }, [activeTab]);
+
+  const fetchLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      const res = await fetch('/api/admin/email-logs');
+      const data = await res.json();
+      setEmailLogs(data);
+    } catch (err) {
+      console.error("Failed to fetch logs", err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const clearLogs = async () => {
+    if (!confirm('Вы уверены, что хотите очистить все логи?')) return;
+    try {
+      await fetch('/api/admin/email-logs/clear', { method: 'POST' });
+      setEmailLogs([]);
+      setMessage({ text: 'Логи очищены', type: 'success' });
+    } catch (err) {
+      setMessage({ text: 'Ошибка при очистке логов', type: 'error' });
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2692,7 +2725,8 @@ const SystemSettingsView = () => {
             { id: 'general', label: 'Общие', icon: Link },
             { id: 'payments', label: 'Оплата', icon: CreditCard },
             { id: 'api', label: 'API Ключи', icon: Zap },
-            { id: 'email', label: 'Email', icon: Mail }
+            { id: 'email', label: 'Email', icon: Mail },
+            { id: 'logs', label: 'Логи Email', icon: FileText }
           ].map(tab => (
             <button
               key={tab.id}
@@ -3022,22 +3056,104 @@ const SystemSettingsView = () => {
             </motion.div>
           )}
 
+          {activeTab === 'logs' && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-6"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <FileText size={20} className="text-zinc-500" />
+                  Логи отправки писем
+                </h3>
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={fetchLogs}
+                    className="p-2 text-zinc-500 hover:text-zinc-900 transition-colors"
+                    title="Обновить"
+                  >
+                    <RefreshCw size={18} className={loadingLogs ? 'animate-spin' : ''} />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={clearLogs}
+                    className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors"
+                  >
+                    Очистить логи
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="bg-zinc-100 text-[10px] font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-200">
+                        <th className="px-4 py-3">Дата</th>
+                        <th className="px-4 py-3">Получатель</th>
+                        <th className="px-4 py-3">Тема</th>
+                        <th className="px-4 py-3">Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-200">
+                      {emailLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-8 text-center text-zinc-400">Логов пока нет</td>
+                        </tr>
+                      ) : (
+                        emailLogs.map(log => (
+                          <tr key={log.id} className="hover:bg-zinc-100 transition-colors">
+                            <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">
+                              {new Date(log.created_at).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-zinc-900">{log.recipient}</td>
+                            <td className="px-4 py-3 text-zinc-600">{log.subject}</td>
+                            <td className="px-4 py-3">
+                              {log.status === 'success' ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-[10px] uppercase">
+                                  <Check size={12} /> Успешно
+                                </span>
+                              ) : (
+                                <div className="space-y-1">
+                                  <span className="inline-flex items-center gap-1 text-red-600 font-bold text-[10px] uppercase">
+                                    <X size={12} /> Ошибка
+                                  </span>
+                                  <p className="text-[10px] text-red-500 font-medium max-w-xs break-words">
+                                    {log.error_message}
+                                  </p>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {message && (
             <div className={`p-4 rounded-2xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
               {message.text}
             </div>
           )}
 
-          <div className="flex justify-end pt-4">
-            <button 
-              type="submit"
-              disabled={isSaving}
-              className="flex items-center gap-2 bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 shadow-lg"
-            >
-              {isSaving ? <RefreshCw size={20} className="animate-spin" /> : <Save size={20} />}
-              Сохранить настройки
-            </button>
-          </div>
+          {activeTab !== 'logs' && (
+            <div className="flex justify-end pt-4">
+              <button 
+                type="submit"
+                disabled={isSaving}
+                className="flex items-center gap-2 bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 shadow-lg"
+              >
+                {isSaving ? <RefreshCw size={20} className="animate-spin" /> : <Save size={20} />}
+                Сохранить настройки
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </motion.div>
