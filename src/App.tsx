@@ -38,12 +38,55 @@ import {
   Mail,
   Save,
   FileSpreadsheet,
-  Download
+  Download,
+  Eye,
+  EyeOff,
+  MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
 import { analyzePrices, recognizeInvoice } from './services/geminiService';
 import { SupplierImport } from './components/SupplierImport';
+import * as XLSX from 'xlsx';
+
+const PasswordInput = ({ 
+  label, 
+  value, 
+  onChange, 
+  placeholder, 
+  show, 
+  onToggle,
+  required = true
+}: { 
+  label: string, 
+  value: string, 
+  onChange: (v: string) => void, 
+  placeholder?: string, 
+  show: boolean, 
+  onToggle: () => void,
+  required?: boolean
+}) => (
+  <div>
+    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">{label}</label>
+    <div className="relative">
+      <input 
+        type={show ? "text" : "password"} 
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder || "••••••••"} 
+        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all pr-12"
+        required={required}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+      >
+        {show ? <EyeOff size={20} /> : <Eye size={20} />}
+      </button>
+    </div>
+  </div>
+);
 
 const Toast = ({ message, type = 'success', onClose }: { message: string, type?: 'success' | 'error', onClose: () => void }) => {
   useEffect(() => {
@@ -205,6 +248,7 @@ const SettingsView = ({ user, onUpdate, showToast }: { user: User, onUpdate: (u:
   const [settings, setSettings] = useState<any>(user.settings || {});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<'profile' | 'delivery' | 'notifications'>('profile');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,7 +274,7 @@ const SettingsView = ({ user, onUpdate, showToast }: { user: User, onUpdate: (u:
 
   return (
     <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-      <div className="p-8 border-b border-zinc-100 bg-zinc-50/50 flex justify-between items-center">
+      <div className="p-8 border-b border-zinc-100 bg-zinc-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-zinc-900 tracking-tight">Настройки профиля</h2>
           <p className="text-zinc-500 text-sm">Укажите актуальные данные вашей организации</p>
@@ -248,6 +292,27 @@ const SettingsView = ({ user, onUpdate, showToast }: { user: User, onUpdate: (u:
         )}
       </div>
 
+      <div className="flex border-b border-zinc-100 overflow-x-auto bg-white">
+        {[
+          { id: 'profile', label: 'Профиль', icon: UserIcon },
+          { id: 'delivery', label: user.type === 'restaurant' ? 'Доставка' : 'Условия', icon: MapPin },
+          { id: 'notifications', label: 'Уведомления', icon: Bell }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 px-8 py-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
+              activeTab === tab.id 
+                ? 'border-emerald-500 text-emerald-600 bg-emerald-50/30' 
+                : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
+            }`}
+          >
+            <tab.icon size={18} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <form onSubmit={handleSubmit} className="p-8 space-y-8">
         {error && (
           <div className="p-4 bg-red-50 text-red-600 text-sm font-bold rounded-2xl border border-red-100">
@@ -255,124 +320,160 @@ const SettingsView = ({ user, onUpdate, showToast }: { user: User, onUpdate: (u:
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <h3 className="font-bold text-zinc-900 uppercase tracking-widest text-xs">Основная информация</h3>
-            <div>
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Название организации</label>
-              <input 
-                type="text" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Напр. Ресторан 'Гурман'"
-                className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Email для уведомлений</label>
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                placeholder="example@mail.com"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Контактный телефон</label>
-              <input 
-                type="tel" 
-                value={settings.phone || ''}
-                onChange={(e) => setSettings({...settings, phone: e.target.value})}
-                placeholder="+7 (___) ___-__-__"
-                className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <h3 className="font-bold text-zinc-900 uppercase tracking-widest text-xs">Детальные настройки</h3>
-            <div>
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Фактический адрес</label>
-              <textarea 
-                value={settings.address || ''}
-                onChange={(e) => setSettings({...settings, address: e.target.value})}
-                placeholder="Город, улица, дом, офис/этаж"
-                className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium h-32 resize-none"
-              />
-            </div>
-
-            {user.type === 'restaurant' ? (
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Желаемое время доставки</label>
-                <select 
-                  value={settings.preferredDeliveryTime || 'morning'}
-                  onChange={(e) => setSettings({...settings, preferredDeliveryTime: e.target.value})}
-                  className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                >
-                  <option value="morning">Утро (08:00 - 12:00)</option>
-                  <option value="afternoon">День (12:00 - 17:00)</option>
-                  <option value="evening">Вечер (17:00 - 21:00)</option>
-                </select>
-              </div>
-            ) : (
-              <>
+        <div className="min-h-[300px]">
+          {activeTab === 'profile' && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-8"
+            >
+              <div className="space-y-6">
+                <h3 className="font-bold text-zinc-900 uppercase tracking-widest text-xs">Основная информация</h3>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Мин. сумма заказа (₽)</label>
-                  <input 
-                    type="number" 
-                    value={settings.minOrderAmount || ''}
-                    onChange={(e) => setSettings({...settings, minOrderAmount: e.target.value})}
-                    placeholder="5000"
-                    className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Регионы доставки</label>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Название организации</label>
                   <input 
                     type="text" 
-                    value={settings.deliveryRegions || ''}
-                    onChange={(e) => setSettings({...settings, deliveryRegions: e.target.value})}
-                    placeholder="Москва, МО, Санкт-Петербург"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Напр. Ресторан 'Гурман'"
+                    className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Email для уведомлений</label>
+                  <input 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                    placeholder="example@mail.com"
+                  />
+                </div>
+              </div>
+              <div className="space-y-6">
+                <h3 className="font-bold text-zinc-900 uppercase tracking-widest text-xs">Контакты</h3>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Контактный телефон</label>
+                  <input 
+                    type="tel" 
+                    value={settings.phone || ''}
+                    onChange={(e) => setSettings({...settings, phone: e.target.value})}
+                    placeholder="+7 (___) ___-__-__"
                     className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
                   />
                 </div>
-              </>
-            )}
-          </div>
-        </div>
+              </div>
+            </motion.div>
+          )}
 
-        <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
-          <h4 className="font-bold text-zinc-900 mb-4 flex items-center gap-2">
-            <Bell size={18} className="text-emerald-600" /> Уведомления
-          </h4>
-          <div className="space-y-4">
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <input 
-                type="checkbox" 
-                checked={settings.notifications?.email ?? true}
-                onChange={(e) => setSettings({
-                  ...settings, 
-                  notifications: { ...(settings.notifications || {}), email: e.target.checked }
-                })}
-                className="w-5 h-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-sm font-medium text-zinc-700 group-hover:text-zinc-900 transition-colors">Получать уведомления на Email</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <input 
-                type="checkbox" 
-                checked={settings.notifications?.browser ?? true}
-                onChange={(e) => setSettings({
-                  ...settings, 
-                  notifications: { ...(settings.notifications || {}), browser: e.target.checked }
-                })}
-                className="w-5 h-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-sm font-medium text-zinc-700 group-hover:text-zinc-900 transition-colors">Браузерные уведомления</span>
-            </label>
-          </div>
+          {activeTab === 'delivery' && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-8"
+            >
+              <div className="space-y-6">
+                <h3 className="font-bold text-zinc-900 uppercase tracking-widest text-xs">Адрес</h3>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Фактический адрес</label>
+                  <textarea 
+                    value={settings.address || ''}
+                    onChange={(e) => setSettings({...settings, address: e.target.value})}
+                    placeholder="Город, улица, дом, офис/этаж"
+                    className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium h-32 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h3 className="font-bold text-zinc-900 uppercase tracking-widest text-xs">Параметры</h3>
+                {user.type === 'restaurant' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Желаемое время доставки</label>
+                    <select 
+                      value={settings.preferredDeliveryTime || 'morning'}
+                      onChange={(e) => setSettings({...settings, preferredDeliveryTime: e.target.value})}
+                      className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                    >
+                      <option value="morning">Утро (08:00 - 12:00)</option>
+                      <option value="afternoon">День (12:00 - 17:00)</option>
+                      <option value="evening">Вечер (17:00 - 21:00)</option>
+                    </select>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Мин. сумма заказа (₽)</label>
+                      <input 
+                        type="number" 
+                        value={settings.minOrderAmount || ''}
+                        onChange={(e) => setSettings({...settings, minOrderAmount: e.target.value})}
+                        placeholder="5000"
+                        className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Регионы доставки</label>
+                      <input 
+                        type="text" 
+                        value={settings.deliveryRegions || ''}
+                        onChange={(e) => setSettings({...settings, deliveryRegions: e.target.value})}
+                        placeholder="Москва, МО, Санкт-Петербург"
+                        className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-6"
+            >
+              <div className="p-8 bg-zinc-50 rounded-3xl border border-zinc-100 max-w-2xl">
+                <h4 className="font-bold text-zinc-900 mb-6 flex items-center gap-2">
+                  <Bell size={18} className="text-emerald-600" /> Уведомления
+                </h4>
+                <div className="space-y-6">
+                  <label className="flex items-center gap-4 cursor-pointer group p-4 bg-white rounded-2xl border border-zinc-100 hover:border-emerald-200 transition-all">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.notifications?.email ?? true}
+                      onChange={(e) => setSettings({
+                        ...settings, 
+                        notifications: { ...(settings.notifications || {}), email: e.target.checked }
+                      })}
+                      className="w-6 h-6 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="block text-sm font-bold text-zinc-900">Получать уведомления на Email</span>
+                      <span className="text-xs text-zinc-500">Важные обновления заказов и системные сообщения</span>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-4 cursor-pointer group p-4 bg-white rounded-2xl border border-zinc-100 hover:border-emerald-200 transition-all">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.notifications?.browser ?? true}
+                      onChange={(e) => setSettings({
+                        ...settings, 
+                        notifications: { ...(settings.notifications || {}), browser: e.target.checked }
+                      })}
+                      className="w-6 h-6 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="block text-sm font-bold text-zinc-900">Браузерные уведомления</span>
+                      <span className="text-xs text-zinc-500">Мгновенные оповещения в браузере</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </motion.div>
+          )}
         </div>
 
         <div className="pt-8 border-t border-zinc-100 flex justify-end">
@@ -1462,6 +1563,7 @@ const IntegrationsView = ({ user }: { user: User }) => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     fetch(`/api/integrations/${user.id}`)
@@ -1550,17 +1652,14 @@ const IntegrationsView = ({ user }: { user: User }) => {
 
           {!integration ? (
             <form onSubmit={handleConnect} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">API Login (из iiko.services)</label>
-                <input 
-                  type="password"
-                  value={apiLogin}
-                  onChange={(e) => setApiLogin(e.target.value)}
-                  placeholder="Введите ваш API Login"
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  required
-                />
-              </div>
+              <PasswordInput 
+                label="API Login (из iiko.services)"
+                value={apiLogin}
+                onChange={setApiLogin}
+                placeholder="Введите ваш API Login"
+                show={showPassword}
+                onToggle={() => setShowPassword(!showPassword)}
+              />
               <button 
                 type="submit"
                 disabled={loading}
@@ -2339,6 +2438,12 @@ const SystemSettingsView = () => {
   const [templates, setTemplates] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [activeTab, setActiveTab] = useState<'general' | 'payments' | 'api' | 'email'>('general');
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+
+  const toggleSecret = (key: string) => {
+    setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     fetch('/api/admin/settings')
@@ -2401,309 +2506,344 @@ const SystemSettingsView = () => {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-zinc-900">Системные настройки</h2>
-            <p className="text-zinc-500">Управление API ключами и учетными данными</p>
+            <p className="text-zinc-500 text-sm">Управление API ключами и учетными данными</p>
           </div>
         </div>
 
+        <div className="flex border-b border-zinc-100 mb-8 overflow-x-auto">
+          {[
+            { id: 'general', label: 'Общие', icon: Link },
+            { id: 'payments', label: 'Оплата', icon: CreditCard },
+            { id: 'api', label: 'API Ключи', icon: Zap },
+            { id: 'email', label: 'Email', icon: Mail }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-6 py-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
+                activeTab === tab.id 
+                  ? 'border-emerald-500 text-emerald-600' 
+                  : 'border-transparent text-zinc-400 hover:text-zinc-600'
+              }`}
+            >
+              <tab.icon size={18} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={handleSave} className="space-y-8">
-          {/* General Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-              <Link size={20} className="text-blue-500" />
-              Общие настройки
-            </h3>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Base URL (Домен сайта)</label>
-              <input 
-                type="text" 
-                value={settings.base_url}
-                onChange={e => setSettings({...settings, base_url: e.target.value})}
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="https://your-domain.com"
-              />
-              <p className="text-[10px] text-zinc-400">Этот URL используется для формирования ссылок возврата Robokassa и других системных уведомлений.</p>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Session Secret</label>
-              <input 
-                type="password" 
-                value={settings.session_secret}
-                onChange={e => setSettings({...settings, session_secret: e.target.value})}
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="Введите секретный ключ для сессий"
-              />
-              <p className="text-[10px] text-zinc-400">Используется для подписи кук сессии. Изменение этого ключа приведет к выходу всех пользователей из системы.</p>
-            </div>
-          </div>
-
-          <div className="h-px bg-zinc-100" />
-
-          {/* Robokassa Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-              <CreditCard size={20} className="text-emerald-500" />
-              Robokassa
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Merchant Login</label>
-                <input 
-                  type="text" 
-                  value={settings.robokassa_login}
-                  onChange={e => setSettings({...settings, robokassa_login: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Test Mode</label>
-                <div className="flex items-center h-[50px]">
-                  <button 
-                    type="button"
-                    onClick={() => setSettings({...settings, robokassa_test: !settings.robokassa_test})}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${settings.robokassa_test ? 'bg-emerald-500' : 'bg-zinc-300'}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.robokassa_test ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                  <span className="ml-3 text-sm font-medium text-zinc-700">{settings.robokassa_test ? 'Включен' : 'Выключен'}</span>
+          {activeTab === 'general' && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-6"
+            >
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <Link size={20} className="text-blue-500" />
+                  Общие настройки
+                </h3>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Base URL (Домен сайта)</label>
+                  <input 
+                    type="text" 
+                    value={settings.base_url}
+                    onChange={e => setSettings({...settings, base_url: e.target.value})}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    placeholder="https://your-domain.com"
+                  />
+                  <p className="text-[10px] text-zinc-400">Этот URL используется для формирования ссылок возврата Robokassa и других системных уведомлений.</p>
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Password 1</label>
-                <input 
-                  type="password" 
-                  value={settings.robokassa_pass1}
-                  onChange={e => setSettings({...settings, robokassa_pass1: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                <PasswordInput 
+                  label="Session Secret"
+                  value={settings.session_secret}
+                  onChange={v => setSettings({...settings, session_secret: v})}
+                  placeholder="Введите секретный ключ для сессий"
+                  show={showSecrets['session_secret']}
+                  onToggle={() => toggleSecret('session_secret')}
                 />
+                <p className="text-[10px] text-zinc-400 -mt-3">Используется для подписи кук сессии. Изменение этого ключа приведет к выходу всех пользователей из системы.</p>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Password 2</label>
-                <input 
-                  type="password" 
-                  value={settings.robokassa_pass2}
-                  onChange={e => setSettings({...settings, robokassa_pass2: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                />
-              </div>
-            </div>
-            
-            <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-3">
-              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Настройки для личного кабинета Robokassa:</p>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase">Result URL (POST):</p>
-                  <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/api/payments/robokassa/result</code>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase">Success URL (GET):</p>
-                  <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/</code>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase">Fail URL (GET):</p>
-                  <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/</code>
-                </div>
-              </div>
-            </div>
-          </div>
+            </motion.div>
+          )}
 
-          <div className="h-px bg-zinc-100" />
-
-          {/* Datanewton Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-              <Zap size={20} className="text-amber-500" />
-              Datanewton API
-            </h3>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">API Key</label>
-              <input 
-                type="password" 
-                value={settings.datanewton_api_key}
-                onChange={e => setSettings({...settings, datanewton_api_key: e.target.value})}
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="Введите ваш API ключ Datanewton"
-              />
-            </div>
-          </div>
-
-          <div className="h-px bg-zinc-100" />
-
-          {/* Gemini API Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-              <Zap size={20} className="text-blue-500" />
-              Gemini AI API
-            </h3>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Gemini API Key</label>
-              <input 
-                type="password" 
-                value={settings.gemini_api_key || ''}
-                onChange={e => setSettings({...settings, gemini_api_key: e.target.value})}
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="Введите ваш Gemini API ключ"
-              />
-              <p className="text-[10px] text-zinc-400">Используется для анализа цен и распознавания накладных.</p>
-            </div>
-          </div>
-
-          <div className="h-px bg-zinc-100" />
-
-          {/* Google API Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-              <FileSpreadsheet size={20} className="text-emerald-500" />
-              Google API (Sheets & Drive)
-            </h3>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Client ID</label>
-                <input 
-                  type="text" 
-                  value={settings.google_client_id || ''}
-                  onChange={e => setSettings({...settings, google_client_id: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  placeholder="Введите Google Client ID"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Client Secret</label>
-                <input 
-                  type="password" 
-                  value={settings.google_client_secret || ''}
-                  onChange={e => setSettings({...settings, google_client_secret: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  placeholder="Введите Google Client Secret"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Redirect URI</label>
-                <input 
-                  type="text" 
-                  value={settings.google_redirect_uri || ''}
-                  onChange={e => setSettings({...settings, google_redirect_uri: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  placeholder={`${settings.base_url}/auth/google/callback`}
-                />
-                <p className="text-[10px] text-zinc-400">Оставьте пустым для использования значения по умолчанию: {settings.base_url}/auth/google/callback</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="h-px bg-zinc-100" />
-
-          {/* SMTP Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-              <Mail size={20} className="text-blue-500" />
-              SMTP (Email)
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Host</label>
-                <input 
-                  type="text" 
-                  value={settings.smtp_host}
-                  onChange={e => setSettings({...settings, smtp_host: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  placeholder="smtp.example.com"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Port</label>
-                <input 
-                  type="number" 
-                  value={settings.smtp_port}
-                  onChange={e => setSettings({...settings, smtp_port: parseInt(e.target.value)})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  placeholder="587"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">User</label>
-                <input 
-                  type="text" 
-                  value={settings.smtp_user}
-                  onChange={e => setSettings({...settings, smtp_user: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  placeholder="user@example.com"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Password</label>
-                <input 
-                  type="password" 
-                  value={settings.smtp_pass}
-                  onChange={e => setSettings({...settings, smtp_pass: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  placeholder="••••••••"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Отправитель (Email)</label>
-                <input 
-                  type="text" 
-                  value={settings.smtp_from || ''}
-                  onChange={e => setSettings({...settings, smtp_from: e.target.value})}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  placeholder="no-reply@restcost.ru"
-                />
-                <p className="text-[10px] text-zinc-400">Email, который будет отображаться в поле "От кого".</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="h-px bg-zinc-100" />
-
-          {/* Email Templates */}
-          <div className="space-y-6">
-            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-              <Mail size={20} className="text-purple-500" />
-              Шаблоны писем
-            </h3>
-            <div className="space-y-8">
-              {templates.map(template => (
-                <div key={template.id} className="p-6 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-4">
-                  <div>
-                    <h4 className="font-bold text-zinc-900">{template.description}</h4>
-                    <p className="text-xs text-zinc-400 uppercase tracking-wider">ID: {template.id}</p>
-                  </div>
+          {activeTab === 'payments' && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-6"
+            >
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <CreditCard size={20} className="text-emerald-500" />
+                  Robokassa
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Тема письма</label>
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Merchant Login</label>
                     <input 
                       type="text" 
-                      value={template.subject}
-                      onChange={e => {
-                        const newTemplates = templates.map(t => t.id === template.id ? {...t, subject: e.target.value} : t);
-                        setTemplates(newTemplates);
-                      }}
-                      className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      value={settings.robokassa_login}
+                      onChange={e => setSettings({...settings, robokassa_login: e.target.value})}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Тело письма (HTML)</label>
-                    <textarea 
-                      value={template.body}
-                      onChange={e => {
-                        const newTemplates = templates.map(t => t.id === template.id ? {...t, body: e.target.value} : t);
-                        setTemplates(newTemplates);
-                      }}
-                      rows={5}
-                      className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-sm"
-                    />
-                    <p className="text-[10px] text-zinc-400">Доступные переменные: {'{{password}}'}, {'{{order_id}}'}, {'{{total}}'}, {'{{base_url}}'}</p>
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Test Mode</label>
+                    <div className="flex items-center h-[50px]">
+                      <button 
+                        type="button"
+                        onClick={() => setSettings({...settings, robokassa_test: !settings.robokassa_test})}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${settings.robokassa_test ? 'bg-emerald-500' : 'bg-zinc-300'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.robokassa_test ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                      <span className="ml-3 text-sm font-medium text-zinc-700">{settings.robokassa_test ? 'Включен' : 'Выключен'}</span>
+                    </div>
                   </div>
-                  <button 
-                    type="button"
-                    onClick={() => handleUpdateTemplate(template)}
-                    className="px-6 py-2 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all"
-                  >
-                    Обновить шаблон
-                  </button>
+                  <PasswordInput 
+                    label="Password 1"
+                    value={settings.robokassa_pass1}
+                    onChange={v => setSettings({...settings, robokassa_pass1: v})}
+                    show={showSecrets['robokassa_pass1']}
+                    onToggle={() => toggleSecret('robokassa_pass1')}
+                  />
+                  <PasswordInput 
+                    label="Password 2"
+                    value={settings.robokassa_pass2}
+                    onChange={v => setSettings({...settings, robokassa_pass2: v})}
+                    show={showSecrets['robokassa_pass2']}
+                    onToggle={() => toggleSecret('robokassa_pass2')}
+                  />
                 </div>
-              ))}
-            </div>
-          </div>
+                
+                <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-3">
+                  <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Настройки для личного кабинета Robokassa:</p>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Result URL (POST):</p>
+                      <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/api/payments/robokassa/result</code>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Success URL (GET):</p>
+                      <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/</code>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Fail URL (GET):</p>
+                      <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/</code>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'api' && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-8"
+            >
+              {/* Datanewton Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <Zap size={20} className="text-amber-500" />
+                  Datanewton API
+                </h3>
+                <PasswordInput 
+                  label="API Key"
+                  value={settings.datanewton_api_key}
+                  onChange={v => setSettings({...settings, datanewton_api_key: v})}
+                  placeholder="Введите ваш API ключ Datanewton"
+                  show={showSecrets['datanewton_api_key']}
+                  onToggle={() => toggleSecret('datanewton_api_key')}
+                  required={false}
+                />
+              </div>
+
+              <div className="h-px bg-zinc-100" />
+
+              {/* Gemini API Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <Zap size={20} className="text-blue-500" />
+                  Gemini AI API
+                </h3>
+                <PasswordInput 
+                  label="Gemini API Key"
+                  value={settings.gemini_api_key}
+                  onChange={v => setSettings({...settings, gemini_api_key: v})}
+                  placeholder="Введите ваш Gemini API ключ"
+                  show={showSecrets['gemini_api_key']}
+                  onToggle={() => toggleSecret('gemini_api_key')}
+                  required={false}
+                />
+                <p className="text-[10px] text-zinc-400 -mt-3">Используется для анализа цен и распознавания накладных.</p>
+              </div>
+
+              <div className="h-px bg-zinc-100" />
+
+              {/* Google API Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <FileSpreadsheet size={20} className="text-emerald-500" />
+                  Google API (Sheets & Drive)
+                </h3>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Client ID</label>
+                    <input 
+                      type="text" 
+                      value={settings.google_client_id || ''}
+                      onChange={e => setSettings({...settings, google_client_id: e.target.value})}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      placeholder="Введите Google Client ID"
+                    />
+                  </div>
+                  <PasswordInput 
+                    label="Client Secret"
+                    value={settings.google_client_secret}
+                    onChange={v => setSettings({...settings, google_client_secret: v})}
+                    placeholder="Введите Google Client Secret"
+                    show={showSecrets['google_client_secret']}
+                    onToggle={() => toggleSecret('google_client_secret')}
+                    required={false}
+                  />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Redirect URI</label>
+                    <input 
+                      type="text" 
+                      value={settings.google_redirect_uri || ''}
+                      onChange={e => setSettings({...settings, google_redirect_uri: e.target.value})}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      placeholder={`${settings.base_url}/auth/google/callback`}
+                    />
+                    <p className="text-[10px] text-zinc-400">Оставьте пустым для использования значения по умолчанию: {settings.base_url}/auth/google/callback</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'email' && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-8"
+            >
+              {/* SMTP Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <Mail size={20} className="text-blue-500" />
+                  SMTP (Email)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Host</label>
+                    <input 
+                      type="text" 
+                      value={settings.smtp_host}
+                      onChange={e => setSettings({...settings, smtp_host: e.target.value})}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      placeholder="smtp.example.com"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Port</label>
+                    <input 
+                      type="number" 
+                      value={settings.smtp_port}
+                      onChange={e => setSettings({...settings, smtp_port: parseInt(e.target.value)})}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      placeholder="587"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">User</label>
+                    <input 
+                      type="text" 
+                      value={settings.smtp_user}
+                      onChange={e => setSettings({...settings, smtp_user: e.target.value})}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      placeholder="user@example.com"
+                    />
+                  </div>
+                  <PasswordInput 
+                    label="Password"
+                    value={settings.smtp_pass}
+                    onChange={v => setSettings({...settings, smtp_pass: v})}
+                    placeholder="••••••••"
+                    show={showSecrets['smtp_pass']}
+                    onToggle={() => toggleSecret('smtp_pass')}
+                  />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Отправитель (Email)</label>
+                    <input 
+                      type="text" 
+                      value={settings.smtp_from || ''}
+                      onChange={e => setSettings({...settings, smtp_from: e.target.value})}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      placeholder="no-reply@restcost.ru"
+                    />
+                    <p className="text-[10px] text-zinc-400">Email, который будет отображаться в поле "От кого".</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-px bg-zinc-100" />
+
+              {/* Email Templates */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <Mail size={20} className="text-purple-500" />
+                  Шаблоны писем
+                </h3>
+                <div className="space-y-8">
+                  {templates.map(template => (
+                    <div key={template.id} className="p-6 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-4">
+                      <div>
+                        <h4 className="font-bold text-zinc-900">{template.description}</h4>
+                        <p className="text-xs text-zinc-400 uppercase tracking-wider">ID: {template.id}</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Тема письма</label>
+                        <input 
+                          type="text" 
+                          value={template.subject}
+                          onChange={e => {
+                            const newTemplates = templates.map(t => t.id === template.id ? {...t, subject: e.target.value} : t);
+                            setTemplates(newTemplates);
+                          }}
+                          className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Тело письма (HTML)</label>
+                        <textarea 
+                          value={template.body}
+                          onChange={e => {
+                            const newTemplates = templates.map(t => t.id === template.id ? {...t, body: e.target.value} : t);
+                            setTemplates(newTemplates);
+                          }}
+                          rows={5}
+                          className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-sm"
+                        />
+                        <p className="text-[10px] text-zinc-400">Доступные переменные: {'{{password}}'}, {'{{order_id}}'}, {'{{total}}'}, {'{{base_url}}'}</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleUpdateTemplate(template)}
+                        className="px-6 py-2 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all"
+                      >
+                        Обновить шаблон
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           {message && (
             <div className={`p-4 rounded-2xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
@@ -3286,6 +3426,7 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat' | 'import'>('dashboard');
   const [integration, setIntegration] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [show1cPass, setShow1cPass] = useState(false);
   const [config1c, setConfig1c] = useState({ serverUrl: '', login: '', password: '' });
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'Бакалея', unit: 'кг' });
@@ -3575,8 +3716,26 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
             </div>
 
             <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-zinc-100">
+              <div className="p-6 border-b border-zinc-100 flex justify-between items-center">
                 <h2 className="text-xl font-bold text-zinc-900">Ваш прайс-лист</h2>
+                <button 
+                  onClick={() => {
+                    const ws = XLSX.utils.json_to_sheet(prices.map(p => ({
+                      'Товар': p.product_name,
+                      'Категория': p.category,
+                      'Цена': p.price,
+                      'Ед. изм.': p.unit,
+                      'Обновлено': new Date(p.updated_at).toLocaleDateString()
+                    })));
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Прайс-лист");
+                    XLSX.writeFile(wb, "price_list.xlsx");
+                    showToast('Прайс-лист экспортирован в Excel');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all"
+                >
+                  <Download size={14} /> Экспорт в XLS
+                </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -3780,16 +3939,13 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                         className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Пароль</label>
-                      <input 
-                        type="password" 
-                        required
-                        value={config1c.password}
-                        onChange={e => setConfig1c({...config1c, password: e.target.value})}
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      />
-                    </div>
+                    <PasswordInput 
+                      label="Пароль"
+                      value={config1c.password}
+                      onChange={(v) => setConfig1c({...config1c, password: v})}
+                      show={show1cPass}
+                      onToggle={() => setShow1cPass(!show1cPass)}
+                    />
                   </div>
 
                   <button 
@@ -3886,6 +4042,7 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
   const [orgName, setOrgName] = useState('');
   const [verificationStep, setVerificationStep] = useState<'input' | 'confirm' | 'form'>('input');
   const [resetMessage, setResetMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleForgotPassword = async () => {
     if (!inn) {
@@ -4096,14 +4253,23 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Пароль</label>
-                  <input 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••" 
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                    required
-                  />
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all pr-12"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex justify-end">
                   <button 

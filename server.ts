@@ -9,6 +9,7 @@ import axios from "axios";
 import crypto from "crypto";
 import { google } from "googleapis";
 import cookieSession from "cookie-session";
+import xlsx from "xlsx";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -448,6 +449,24 @@ async function startServer() {
       res.json({ values: response.data.values, sheetName });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch sheet data" });
+    }
+  });
+
+  app.get("/api/products/export", (req, res) => {
+    try {
+      const products = db.prepare("SELECT name, category, unit FROM products").all();
+      const worksheet = xlsx.utils.json_to_sheet(products);
+      const workbook = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(workbook, worksheet, "Products");
+      
+      const buffer = xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
+      
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", "attachment; filename=products.xlsx");
+      res.send(buffer);
+    } catch (error) {
+      console.error("Export error:", error);
+      res.status(500).json({ error: "Failed to export products" });
     }
   });
 
