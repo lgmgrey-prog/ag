@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart3, 
   HelpCircle,
@@ -14,6 +14,7 @@ import {
   FileText, 
   Plus, 
   ChevronRight,
+  ChevronLeft,
   ArrowRight,
   CheckCircle2,
   AlertCircle,
@@ -1721,37 +1722,55 @@ const IntegrationsView = ({ user, onSyncSuccess }: { user: User, onSyncSuccess?:
   );
 };
 
-const CatalogView = () => {
+const CatalogView = ({ user }: { user: User }) => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 15;
 
-  useEffect(() => {
-    fetch('/api/products')
+  const fetchProducts = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams({
+      restaurantId: user.id.toString(),
+      page: page.toString(),
+      limit: limit.toString(),
+      search: searchTerm
+    });
+
+    fetch(`/api/products?${params}`)
       .then(res => res.json())
       .then(data => {
-        setProducts(data);
+        setProducts(data.products);
+        setTotalPages(data.totalPages);
+        setTotal(data.total);
         setLoading(false);
       })
       .catch(err => {
         console.error(err);
         setLoading(false);
       });
-  }, []);
+  }, [user.id, page, searchTerm]);
 
-  const filteredProducts = products.filter(p => {
-    const name = p.name || '';
-    const category = p.category || '';
-    return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           category.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  // Reset to page 1 when searching
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
 
   return (
     <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
       <div className="p-6 border-b border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-zinc-900">Каталог товаров</h2>
-          <p className="text-sm text-zinc-500">Все товары, синхронизированные из iiko и других систем</p>
+          <h2 className="text-xl font-bold text-zinc-900">Ваш каталог iiko</h2>
+          <p className="text-sm text-zinc-500">
+            {total > 0 ? `Найдено ${total} товаров` : 'Товары, синхронизированные из вашей системы iiko'}
+          </p>
         </div>
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
@@ -1759,7 +1778,7 @@ const CatalogView = () => {
             type="text" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Поиск по названию или категории..." 
+            placeholder="Поиск в вашем каталоге..." 
             className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
           />
         </div>
@@ -1770,35 +1789,88 @@ const CatalogView = () => {
           <RefreshCw className="animate-spin mx-auto text-emerald-600 mb-4" size={32} />
           <p className="text-zinc-500 font-medium">Загрузка каталога...</p>
         </div>
-      ) : filteredProducts.length === 0 ? (
+      ) : products.length === 0 ? (
         <div className="p-20 text-center">
           <Package size={64} className="mx-auto text-zinc-100 mb-6" />
           <p className="text-zinc-400 font-medium">Товары не найдены</p>
-          <p className="text-sm text-zinc-300 mt-2">Попробуйте изменить поисковый запрос или синхронизируйте iiko</p>
+          <p className="text-sm text-zinc-300 mt-2">
+            {searchTerm ? 'Попробуйте изменить поисковый запрос' : 'Сначала синхронизируйте данные в разделе "Интеграции"'}
+          </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                <th className="px-8 py-5">Название</th>
-                <th className="px-8 py-5">Категория</th>
-                <th className="px-8 py-5">Ед. изм.</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {filteredProducts.map((p, i) => (
-                <tr key={i} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-8 py-5 font-bold text-zinc-900">{p.name}</td>
-                  <td className="px-8 py-5">
-                    <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">{p.category}</span>
-                  </td>
-                  <td className="px-8 py-5 text-sm text-zinc-500">{p.unit}</td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                  <th className="px-8 py-5">Название</th>
+                  <th className="px-8 py-5">Категория</th>
+                  <th className="px-8 py-5">Ед. изм.</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {products.map((p, i) => (
+                  <tr key={i} className="hover:bg-zinc-50 transition-colors">
+                    <td className="px-8 py-5 font-bold text-zinc-900">{p.name}</td>
+                    <td className="px-8 py-5">
+                      <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">{p.category}</span>
+                    </td>
+                    <td className="px-8 py-5 text-sm text-zinc-500">{p.unit}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-6 border-t border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+              <p className="text-sm text-zinc-500 font-medium">
+                Страница <span className="text-zinc-900">{page}</span> из <span className="text-zinc-900">{totalPages}</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-2 rounded-xl border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <div className="flex items-center gap-1">
+                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                    let pageNum = page;
+                    if (page <= 3) pageNum = i + 1;
+                    else if (page >= totalPages - 2) pageNum = totalPages - 4 + i;
+                    else pageNum = page - 2 + i;
+                    
+                    if (pageNum <= 0 || pageNum > totalPages) return null;
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPage(pageNum)}
+                        className={`w-10 h-10 rounded-xl text-sm font-bold transition-all ${
+                          page === pageNum 
+                            ? 'bg-zinc-900 text-white shadow-lg shadow-zinc-200' 
+                            : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-2 rounded-xl border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -2496,7 +2568,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
           >
-            <CatalogView />
+            <CatalogView user={user} />
           </motion.div>
         )}
         {activeTab === 'settings' && (

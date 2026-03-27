@@ -38,6 +38,14 @@ db.exec(`
     unit TEXT NOT NULL DEFAULT 'шт'
   );
 
+  CREATE TABLE IF NOT EXISTS restaurant_products (
+    restaurant_id INTEGER,
+    product_id INTEGER,
+    PRIMARY KEY(restaurant_id, product_id),
+    FOREIGN KEY(restaurant_id) REFERENCES users(id),
+    FOREIGN KEY(product_id) REFERENCES products(id)
+  );
+
   CREATE TABLE IF NOT EXISTS price_lists (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     supplier_id INTEGER,
@@ -471,10 +479,40 @@ async function startServer() {
   });
 
   app.get("/api/products", (req, res) => {
+    const { restaurantId, page = 1, limit = 20, search = "" } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+    
     try {
-      const products = db.prepare("SELECT * FROM products ORDER BY name").all();
-      res.json(products);
+      let query = "SELECT p.* FROM products p";
+      let countQuery = "SELECT COUNT(*) as total FROM products p";
+      const params: any[] = [];
+
+      if (restaurantId) {
+        query += " JOIN restaurant_products rp ON p.id = rp.product_id WHERE rp.restaurant_id = ?";
+        countQuery += " JOIN restaurant_products rp ON p.id = rp.product_id WHERE rp.restaurant_id = ?";
+        params.push(restaurantId);
+      }
+
+      if (search) {
+        const searchClause = restaurantId ? " AND (p.name LIKE ? OR p.category LIKE ?)" : " WHERE (p.name LIKE ? OR p.category LIKE ?)";
+        query += searchClause;
+        countQuery += searchClause;
+        const searchParam = `%${search}%`;
+        params.push(searchParam, searchParam);
+      }
+
+      query += " ORDER BY p.name LIMIT ? OFFSET ?";
+      const total = (db.prepare(countQuery).get(...params.slice(0, params.length)) as any).total;
+      const products = db.prepare(query).all(...params, limit, offset);
+      
+      res.json({
+        products,
+        total,
+        page: Number(page),
+        totalPages: Math.ceil(total / Number(limit))
+      });
     } catch (err) {
+      console.error(err);
       res.status(500).json({ error: "Failed to fetch products" });
     }
   });
@@ -1396,10 +1434,17 @@ async function startServer() {
       
       // 3. Sync to local products table
       const insertProduct = db.prepare("INSERT OR IGNORE INTO products (name, category, unit) VALUES (?, ?, ?)");
+      const getProduct = db.prepare("SELECT id FROM products WHERE name = ?");
+      const linkProduct = db.prepare("INSERT OR IGNORE INTO restaurant_products (restaurant_id, product_id) VALUES (?, ?)");
+      
       let count = 0;
       products.forEach((p: any) => {
         if (p.type === 'Product') {
           insertProduct.run(p.name || 'Без названия', p.parentGroup || 'Без категории', p.measureUnit || 'шт');
+          const product = getProduct.get(p.name || 'Без названия') as any;
+          if (product) {
+            linkProduct.run(userId, product.id);
+          }
           count++;
         }
       });
