@@ -2336,6 +2336,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
 
 const SystemSettingsView = () => {
   const [settings, setSettings] = useState<any>(null);
+  const [templates, setTemplates] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
@@ -2343,6 +2344,9 @@ const SystemSettingsView = () => {
     fetch('/api/admin/settings')
       .then(res => res.json())
       .then(setSettings);
+    fetch('/api/admin/email-templates')
+      .then(res => res.json())
+      .then(setTemplates);
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -2364,6 +2368,21 @@ const SystemSettingsView = () => {
       setMessage({ text: 'Ошибка сети', type: 'error' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUpdateTemplate = async (template: any) => {
+    try {
+      const res = await fetch('/api/admin/email-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(template)
+      });
+      if (res.ok) {
+        setMessage({ text: `Шаблон "${template.id}" обновлен`, type: 'success' });
+      }
+    } catch (err) {
+      setMessage({ text: 'Ошибка при обновлении шаблона', type: 'error' });
     }
   };
 
@@ -2620,6 +2639,69 @@ const SystemSettingsView = () => {
                   placeholder="••••••••"
                 />
               </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Отправитель (Email)</label>
+                <input 
+                  type="text" 
+                  value={settings.smtp_from || ''}
+                  onChange={e => setSettings({...settings, smtp_from: e.target.value})}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  placeholder="no-reply@restcost.ru"
+                />
+                <p className="text-[10px] text-zinc-400">Email, который будет отображаться в поле "От кого".</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-px bg-zinc-100" />
+
+          {/* Email Templates */}
+          <div className="space-y-6">
+            <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+              <Mail size={20} className="text-purple-500" />
+              Шаблоны писем
+            </h3>
+            <div className="space-y-8">
+              {templates.map(template => (
+                <div key={template.id} className="p-6 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-4">
+                  <div>
+                    <h4 className="font-bold text-zinc-900">{template.description}</h4>
+                    <p className="text-xs text-zinc-400 uppercase tracking-wider">ID: {template.id}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Тема письма</label>
+                    <input 
+                      type="text" 
+                      value={template.subject}
+                      onChange={e => {
+                        const newTemplates = templates.map(t => t.id === template.id ? {...t, subject: e.target.value} : t);
+                        setTemplates(newTemplates);
+                      }}
+                      className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Тело письма (HTML)</label>
+                    <textarea 
+                      value={template.body}
+                      onChange={e => {
+                        const newTemplates = templates.map(t => t.id === template.id ? {...t, body: e.target.value} : t);
+                        setTemplates(newTemplates);
+                      }}
+                      rows={5}
+                      className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-sm"
+                    />
+                    <p className="text-[10px] text-zinc-400">Доступные переменные: {'{{password}}'}, {'{{order_id}}'}, {'{{total}}'}, {'{{base_url}}'}</p>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => handleUpdateTemplate(template)}
+                    className="px-6 py-2 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all"
+                  >
+                    Обновить шаблон
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -3803,6 +3885,46 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
   const [isVerifying, setIsVerifying] = useState(false);
   const [orgName, setOrgName] = useState('');
   const [verificationStep, setVerificationStep] = useState<'input' | 'confirm' | 'form'>('input');
+  const [resetMessage, setResetMessage] = useState('');
+
+  const handleForgotPassword = async () => {
+    if (!inn) {
+      setError('Сначала введите ваш ИНН');
+      return;
+    }
+    
+    setError('');
+    setResetMessage('');
+    
+    try {
+      // First find user email by INN
+      const userRes = await fetch(`/api/users/by-inn/${inn}`);
+      const userData = await userRes.json();
+      
+      if (!userRes.ok) {
+        throw new Error(userData.error || 'Пользователь не найден');
+      }
+      
+      if (!userData.email) {
+        throw new Error('Для этого аккаунта не указан email. Обратитесь в поддержку.');
+      }
+
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userData.email })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Ошибка при восстановлении пароля');
+      }
+      
+      setResetMessage(`Новый пароль отправлен на ${userData.email}`);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
 
   const handleVerifyINN = async () => {
     if (inn.length < 10) {
@@ -3897,6 +4019,12 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
           </div>
         )}
 
+        {resetMessage && (
+          <div className="mb-6 p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 text-sm rounded-xl flex items-center gap-2">
+            <CheckCircle2 size={16} /> {resetMessage}
+          </div>
+        )}
+
         {mode === 'register' && verificationStep === 'confirm' ? (
           <div className="space-y-6">
             <div className="p-6 bg-zinc-50 rounded-2xl border border-zinc-100">
@@ -3964,7 +4092,30 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
               </div>
             )}
 
-            {mode === 'register' ? (
+            {mode === 'login' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Пароль</label>
+                  <input 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••" 
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                    required
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button 
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+                  >
+                    Забыли пароль?
+                  </button>
+                </div>
+              </div>
+            ) : (
               verificationStep === 'form' && (
                 <div>
                   <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Email для пароля</label>
@@ -3978,18 +4129,6 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
                   />
                 </div>
               )
-            ) : (
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Пароль</label>
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" 
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                  required
-                />
-              </div>
             )}
 
             <button 

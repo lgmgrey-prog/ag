@@ -104,11 +104,22 @@ db.exec(`
     google_client_secret TEXT,
     google_redirect_uri TEXT,
     session_secret TEXT,
-    gemini_api_key TEXT
+    gemini_api_key TEXT,
+    smtp_from TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS email_templates (
+    id TEXT PRIMARY KEY,
+    subject TEXT,
+    body TEXT,
+    description TEXT
   );
 `);
 
 // Migration: Add columns if they don't exist
+try {
+  db.prepare("ALTER TABLE system_settings ADD COLUMN smtp_from TEXT").run();
+} catch (e) {}
 try {
   db.prepare("ALTER TABLE system_settings ADD COLUMN gemini_api_key TEXT").run();
 } catch (e) {}
@@ -145,9 +156,35 @@ try {
 
 // Initial settings insert (AFTER migrations to ensure columns exist)
 db.exec(`
-  INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url, google_client_id, google_client_secret, google_redirect_uri, session_secret, gemini_api_key)
-  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', '', '', '', '', 'secret-key', '');
+  INSERT OR IGNORE INTO system_settings (id, robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, datanewton_api_key, base_url, google_client_id, google_client_secret, google_redirect_uri, session_secret, gemini_api_key, smtp_from)
+  VALUES (1, 'test_merchant', 'pass1', 'pass2', 1, '', '', '', '', '', 'secret-key', '', 'no-reply@restcost.ru');
 `);
+
+// Seed default email templates
+const defaultTemplates = [
+  {
+    id: 'welcome',
+    subject: 'Добро пожаловать в ProcureHub',
+    body: '<p>Добро пожаловать в <b>ProcureHub</b>!</p><p>Ваш временный пароль для входа: <b>{{password}}</b></p><p><a href="{{base_url}}">Войти в систему</a></p>',
+    description: 'Письмо при регистрации нового пользователя'
+  },
+  {
+    id: 'password_reset',
+    subject: 'Восстановление пароля ProcureHub',
+    body: '<p>Вы запросили восстановление пароля.</p><p>Ваш новый пароль: <b>{{password}}</b></p><p><a href="{{base_url}}">Войти в систему</a></p>',
+    description: 'Письмо при восстановлении пароля'
+  },
+  {
+    id: 'order_created',
+    subject: 'Новый заказ #{{order_id}}',
+    body: '<p>Создан новый заказ #{{order_id}}.</p><p>Сумма: {{total}} руб.</p><p><a href="{{base_url}}">Посмотреть детали</a></p>',
+    description: 'Уведомление о новом заказе'
+  }
+];
+
+defaultTemplates.forEach(t => {
+  db.prepare("INSERT OR IGNORE INTO email_templates (id, subject, body, description) VALUES (?, ?, ?, ?)").run(t.id, t.subject, t.body, t.description);
+});
 
 
 // Helper to get system settings
@@ -168,7 +205,8 @@ function getSystemSettings() {
     google_client_secret: settings?.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "",
     google_redirect_uri: settings?.google_redirect_uri || process.env.GOOGLE_REDIRECT_URI || "",
     session_secret: settings?.session_secret || process.env.SESSION_SECRET || "secret-key",
-    gemini_api_key: settings?.gemini_api_key || process.env.GEMINI_API_KEY || ""
+    gemini_api_key: settings?.gemini_api_key || process.env.GEMINI_API_KEY || "",
+    smtp_from: settings?.smtp_from || process.env.SMTP_FROM || "no-reply@restcost.ru"
   };
 }
 
@@ -236,12 +274,30 @@ if (userCount === 0) {
 // Email Transporter Setup
 // Transporter is created dynamically in sendWelcomeEmail using system settings
 
-async function sendWelcomeEmail(email: string, password: string) {
+async function sendEmail(to: string, templateId: string, variables: Record<string, any>) {
   const settings = getSystemSettings();
   if (!settings.smtp_user) {
-    console.log("SMTP not configured. Password for", email, "is:", password);
+    console.log(`SMTP not configured. Email to ${to} with template ${templateId} not sent.`);
+    console.log("Variables:", variables);
     return;
   }
+
+  const template = db.prepare("SELECT * FROM email_templates WHERE id = ?").get(templateId) as any;
+  if (!template) {
+    console.error(`Email template ${templateId} not found.`);
+    return;
+  }
+
+  let subject = template.subject;
+  let body = template.body;
+
+  const allVariables = { ...variables, base_url: settings.base_url };
+
+  Object.entries(allVariables).forEach(([key, value]) => {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    subject = subject.replace(regex, value);
+    body = body.replace(regex, value);
+  });
 
   try {
     const transporter = nodemailer.createTransport({
@@ -255,15 +311,18 @@ async function sendWelcomeEmail(email: string, password: string) {
     });
 
     await transporter.sendMail({
-      from: `"ProcureHub HoReCa" <${settings.smtp_user}>`,
-      to: email,
-      subject: "Ваш пароль для ProcureHub",
-      text: `Добро пожаловать в ProcureHub! Ваш временный пароль для входа: ${password}\n\nВход в систему: ${settings.base_url}`,
-      html: `<p>Добро пожаловать в <b>ProcureHub</b>!</p><p>Ваш временный пароль для входа: <b>${password}</b></p><p><a href="${settings.base_url}">Войти в систему</a></p>`,
+      from: `"ProcureHub" <${settings.smtp_from}>`,
+      to: to,
+      subject: subject,
+      html: body,
     });
   } catch (error) {
     console.error("Failed to send email:", error);
   }
+}
+
+async function sendWelcomeEmail(email: string, password: string) {
+  await sendEmail(email, 'welcome', { password });
 }
 
 // Robokassa Payment URL Generator
@@ -592,6 +651,25 @@ async function startServer() {
     } catch (err: any) {
       console.error("Auth register error:", err);
       res.status(500).json({ error: "Ошибка при регистрации" });
+    }
+  });
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    const { email } = req.body;
+    try {
+      const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
+      if (!user) {
+        return res.status(404).json({ error: "Пользователь с таким email не найден" });
+      }
+
+      const newPassword = Math.random().toString(36).slice(-8);
+      db.prepare("UPDATE users SET password = ? WHERE id = ?").run(newPassword, user.id);
+
+      await sendEmail(email, 'password_reset', { password: newPassword });
+
+      res.json({ success: true, message: "Новый пароль отправлен на вашу почту" });
+    } catch (err) {
+      res.status(500).json({ error: "Ошибка при восстановлении пароля" });
     }
   });
 
@@ -1010,7 +1088,8 @@ async function startServer() {
     const { 
       robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, 
       datanewton_api_key, smtp_host, smtp_port, smtp_user, smtp_pass, base_url,
-      google_client_id, google_client_secret, google_redirect_uri, session_secret, gemini_api_key
+      google_client_id, google_client_secret, google_redirect_uri, session_secret, gemini_api_key,
+      smtp_from
     } = req.body;
 
     try {
@@ -1030,7 +1109,8 @@ async function startServer() {
           google_client_secret = ?,
           google_redirect_uri = ?,
           session_secret = ?,
-          gemini_api_key = ?
+          gemini_api_key = ?,
+          smtp_from = ?
         WHERE id = 1
       `).run(
         robokassa_login, 
@@ -1047,12 +1127,45 @@ async function startServer() {
         google_client_secret,
         google_redirect_uri,
         session_secret,
-        gemini_api_key
+        gemini_api_key,
+        smtp_from
       );
       res.json({ success: true });
     } catch (err) {
       console.error("Update settings error:", err);
       res.status(500).json({ error: "Failed to update settings" });
+    }
+  });
+
+  app.get("/api/admin/email-templates", (req, res) => {
+    try {
+      const templates = db.prepare("SELECT * FROM email_templates").all();
+      res.json(templates);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  app.post("/api/admin/email-templates", (req, res) => {
+    const { id, subject, body } = req.body;
+    try {
+      db.prepare("UPDATE email_templates SET subject = ?, body = ? WHERE id = ?").run(subject, body, id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  app.get("/api/users/by-inn/:inn", (req, res) => {
+    const { inn } = req.params;
+    try {
+      const user = db.prepare("SELECT id, email FROM users WHERE inn = ?").get(inn);
+      if (!user) {
+        return res.status(404).json({ error: "Пользователь не найден" });
+      }
+      res.json(user);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch user" });
     }
   });
 
@@ -1280,7 +1393,21 @@ async function startServer() {
         INSERT INTO orders (restaurant_id, supplier_id, items, total)
         VALUES (?, ?, ?, ?)
       `).run(restaurant_id, supplier_id, JSON.stringify(items), total);
-      res.json({ id: info.lastInsertRowid, success: true });
+      const orderId = info.lastInsertRowid;
+
+      // Notify restaurant
+      const restaurant = db.prepare("SELECT email FROM users WHERE id = ?").get(restaurant_id) as any;
+      if (restaurant?.email) {
+        sendEmail(restaurant.email, 'order_created', { order_id: orderId, total });
+      }
+
+      // Notify supplier
+      const supplier = db.prepare("SELECT email FROM users WHERE id = ?").get(supplier_id) as any;
+      if (supplier?.email) {
+        sendEmail(supplier.email, 'order_created', { order_id: orderId, total });
+      }
+
+      res.json({ id: orderId, success: true });
     } catch (err) {
       res.status(500).json({ error: "Failed to create order" });
     }
