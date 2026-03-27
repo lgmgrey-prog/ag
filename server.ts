@@ -33,9 +33,9 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE,
-    category TEXT,
-    unit TEXT
+    name TEXT UNIQUE NOT NULL,
+    category TEXT NOT NULL DEFAULT 'Без категории',
+    unit TEXT NOT NULL DEFAULT 'шт'
   );
 
   CREATE TABLE IF NOT EXISTS price_lists (
@@ -494,8 +494,8 @@ async function startServer() {
 
       const transaction = db.transaction((items) => {
         for (const item of items) {
-          insertProduct.run(item.name, item.category || 'Общее', item.unit || 'кг');
-          const product = getProduct.get(item.name) as any;
+          insertProduct.run(item.name || 'Без названия', item.category || 'Общее', item.unit || 'кг');
+          const product = getProduct.get(item.name || 'Без названия') as any;
           if (product) {
             upsertPrice.run(supplier_id, product.id, item.price);
           }
@@ -1399,7 +1399,7 @@ async function startServer() {
       let count = 0;
       products.forEach((p: any) => {
         if (p.type === 'Product') {
-          insertProduct.run(p.name, p.parentGroup || 'Без категории', p.measureUnit || 'шт');
+          insertProduct.run(p.name || 'Без названия', p.parentGroup || 'Без категории', p.measureUnit || 'шт');
           count++;
         }
       });

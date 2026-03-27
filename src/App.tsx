@@ -1739,10 +1739,12 @@ const CatalogView = () => {
       });
   }, []);
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => {
+    const name = p.name || '';
+    const category = p.category || '';
+    return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           category.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   return (
     <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
