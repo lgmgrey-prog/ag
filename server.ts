@@ -329,8 +329,9 @@ async function sendEmail(to: string, templateId: string, variables: Record<strin
       },
     });
 
+    const fromEmail = settings.smtp_from || settings.smtp_user;
     await transporter.sendMail({
-      from: `"ProcureHub" <${settings.smtp_from}>`,
+      from: `"RestCost" <${fromEmail}>`,
       to: to,
       subject: subject,
       html: body,
@@ -1235,6 +1236,59 @@ async function startServer() {
     } catch (err) {
       console.error("Update settings error:", err);
       res.status(500).json({ error: "Failed to update settings" });
+    }
+  });
+
+  app.post("/api/admin/settings/test-email", async (req, res) => {
+    const { smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from, test_recipient } = req.body;
+    
+    if (!smtp_user || !smtp_pass || !smtp_host || !smtp_port || !test_recipient) {
+      return res.status(400).json({ error: "Все поля SMTP и адрес получателя обязательны для теста" });
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtp_host,
+        port: parseInt(smtp_port),
+        secure: parseInt(smtp_port) === 465,
+        auth: {
+          user: smtp_user,
+          pass: smtp_pass,
+        },
+      });
+
+      const fromEmail = smtp_from || smtp_user;
+      
+      await transporter.sendMail({
+        from: `"RestCost Test" <${fromEmail}>`,
+        to: test_recipient,
+        subject: "Тестовое письмо от RestCost",
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+            <h1 style="color: #1a1a1a;">Проверка настроек SMTP</h1>
+            <p>Это тестовое письмо отправлено для проверки настроек вашего почтового сервера.</p>
+            <p style="background: #f0fdf4; color: #166534; padding: 10px; border-radius: 5px; font-weight: bold;">
+              Если вы видите это письмо, значит настройки указаны верно!
+            </p>
+            <p>Параметры теста:</p>
+            <ul style="color: #666;">
+              <li>Хост: ${smtp_host}</li>
+              <li>Порт: ${smtp_port}</li>
+              <li>Пользователь: ${smtp_user}</li>
+            </ul>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #999;">Дата отправки: ${new Date().toLocaleString()}</p>
+          </div>
+        `,
+      });
+
+      res.json({ success: true, message: "Тестовое письмо успешно отправлено!" });
+    } catch (error: any) {
+      console.error("SMTP Test Error:", error);
+      res.status(500).json({ 
+        error: "Ошибка при отправке тестового письма", 
+        details: error.message || String(error) 
+      });
     }
   });
 

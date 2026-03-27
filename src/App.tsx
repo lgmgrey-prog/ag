@@ -2620,6 +2620,9 @@ const SystemSettingsView = () => {
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [testRecipient, setTestRecipient] = useState('');
+  const [isTestingEmail, setIsTestingEmail] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
   const toggleSecret = (key: string) => {
     setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }));
@@ -2650,6 +2653,38 @@ const SystemSettingsView = () => {
       console.error("Failed to fetch logs", err);
     } finally {
       setLoadingLogs(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testRecipient) {
+      setTestEmailResult({ text: 'Введите email получателя', type: 'error' });
+      return;
+    }
+    setIsTestingEmail(true);
+    setTestEmailResult(null);
+    try {
+      const res = await fetch('/api/admin/settings/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...settings,
+          test_recipient: testRecipient
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTestEmailResult({ text: data.message, type: 'success' });
+      } else {
+        setTestEmailResult({ 
+          text: data.error + (data.details ? ': ' + data.details : ''), 
+          type: 'error' 
+        });
+      }
+    } catch (err) {
+      setTestEmailResult({ text: 'Ошибка сети при отправке теста', type: 'error' });
+    } finally {
+      setIsTestingEmail(false);
     }
   };
 
@@ -3000,6 +3035,37 @@ const SystemSettingsView = () => {
                     <p className="text-[10px] text-zinc-400">Email, который будет отображаться в поле "От кого".</p>
                   </div>
                 </div>
+
+                {/* Test Email Tool */}
+                <div className="p-6 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-4">
+                  <div className="flex items-center gap-2 text-zinc-900 font-bold text-sm">
+                    <Send size={16} className="text-emerald-500" />
+                    Проверка настроек
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input 
+                      type="email" 
+                      value={testRecipient}
+                      onChange={e => setTestRecipient(e.target.value)}
+                      placeholder="Email для теста"
+                      className="flex-1 px-4 py-3 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleTestEmail}
+                      disabled={isTestingEmail}
+                      className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
+                    >
+                      {isTestingEmail ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+                      Отправить тест
+                    </button>
+                  </div>
+                  {testEmailResult && (
+                    <div className={`p-4 rounded-xl text-xs font-bold ${testEmailResult.type === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      {testEmailResult.text}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="h-px bg-zinc-100" />
@@ -3133,6 +3199,23 @@ const SystemSettingsView = () => {
                   </table>
                 </div>
               </div>
+
+              {emailLogs.some(log => log.status === 'error' && log.error_message?.includes('535')) && (
+                <div className="p-6 bg-amber-50 rounded-2xl border border-amber-100 space-y-3">
+                  <div className="flex items-center gap-2 text-amber-800 font-bold">
+                    <AlertCircle size={20} />
+                    <span>Обнаружена ошибка авторизации (535)</span>
+                  </div>
+                  <div className="text-sm text-amber-700 space-y-2">
+                    <p>Если вы используете Яндекс.Почту, эта ошибка обычно означает одно из двух:</p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li><strong>Пароль приложения:</strong> Вы используете обычный пароль от почты. Нужно создать специальный "Пароль приложения" в Яндекс ID.</li>
+                      <li><strong>Доступ по IMAP/SMTP:</strong> В настройках Яндекс.Почты (Почтовые программы) не включена галочка "Разрешить доступ по протоколу IMAP/SMTP".</li>
+                    </ul>
+                    <p className="text-xs font-medium pt-2">Инструкция: Яндекс.Почта → Все настройки → Почтовые программы → Включить "С сервера imap.yandex.ru по протоколу IMAP".</p>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
