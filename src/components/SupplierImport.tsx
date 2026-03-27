@@ -28,7 +28,7 @@ interface Spreadsheet {
 
 interface ImportData {
   headers: string[];
-  rows: string[][];
+  rows: any[][];
   sourceName: string;
   sourceType: 'google' | 'csv' | 'xml' | 'xlsx';
 }
@@ -146,7 +146,7 @@ export const SupplierImport = ({ user, showToast, onImportSuccess }: {
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
         
         if (jsonData.length > 0) {
           setImportData({
@@ -242,12 +242,22 @@ export const SupplierImport = ({ user, showToast, onImportSuccess }: {
     setImportProgress(0);
     
     try {
-      const products = importData.rows.map(row => ({
-        name: row[mapping.name],
-        price: parseFloat(row[mapping.price]?.replace(/[^\d.,]/g, '').replace(',', '.') || '0'),
-        category: mapping.category === -1 ? 'Общее' : (row[mapping.category] || 'Общее'),
-        unit: mapping.unit === -1 ? 'кг' : (row[mapping.unit] || 'кг')
-      })).filter(p => p.name && p.price > 0);
+      const products = importData.rows.map(row => {
+        const rawPrice = row[mapping.price];
+        let priceStr = '0';
+        if (typeof rawPrice === 'number') {
+          priceStr = rawPrice.toString();
+        } else if (typeof rawPrice === 'string') {
+          priceStr = rawPrice.replace(/[^\d.,]/g, '').replace(',', '.');
+        }
+        
+        return {
+          name: row[mapping.name],
+          price: parseFloat(priceStr || '0'),
+          category: mapping.category === -1 ? 'Общее' : (row[mapping.category] || 'Общее'),
+          unit: mapping.unit === -1 ? 'кг' : (row[mapping.unit] || 'кг')
+        };
+      }).filter(p => p.name && p.price > 0);
 
       // Simulate progress
       const interval = setInterval(() => {
