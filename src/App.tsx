@@ -47,6 +47,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
 import { analyzePrices, recognizeInvoice } from './services/geminiService';
 import { SupplierImport } from './components/SupplierImport';
@@ -2241,7 +2244,12 @@ const PublicOfferModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
               {loading ? (
                 <div className="py-20 text-center text-zinc-400">Загрузка текста оферты...</div>
               ) : (
-                <ReactMarkdown>{content}</ReactMarkdown>
+                <ReactMarkdown 
+                  remarkPlugins={[remarkBreaks, remarkGfm]} 
+                  rehypePlugins={[rehypeRaw]}
+                >
+                  {content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')}
+                </ReactMarkdown>
               )}
             </div>
             <div className="p-6 border-t border-zinc-100 bg-zinc-50 flex justify-end">
@@ -3046,18 +3054,25 @@ const SystemSettingsView = () => {
                 <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-3">
                   <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Настройки для личного кабинета Robokassa:</p>
                   <div className="space-y-2">
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Result URL (POST):</p>
-                      <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/api/payments/robokassa/result</code>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Success URL (GET):</p>
-                      <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/</code>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Fail URL (GET):</p>
-                      <code className="text-[11px] text-emerald-600 break-all">{settings.base_url}/</code>
-                    </div>
+                    {(() => {
+                      const baseUrl = (settings.base_url || '').trim().replace(/\/+$/, '');
+                      return (
+                        <>
+                          <div>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase">Result URL (POST):</p>
+                            <code className="text-[11px] text-emerald-600 break-all">{baseUrl}/api/payments/robokassa/result</code>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase">Success URL (GET):</p>
+                            <code className="text-[11px] text-emerald-600 break-all">{baseUrl}/</code>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase">Fail URL (GET):</p>
+                            <code className="text-[11px] text-emerald-600 break-all">{baseUrl}/</code>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

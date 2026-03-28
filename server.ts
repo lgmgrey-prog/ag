@@ -235,7 +235,7 @@ function getSystemSettings() {
     smtp_port: settings?.smtp_port || parseInt(process.env.SMTP_PORT || "587"),
     smtp_user: settings?.smtp_user || process.env.SMTP_USER || "",
     smtp_pass: settings?.smtp_pass || process.env.SMTP_PASS || "",
-    base_url: settings?.base_url || process.env.APP_URL || "",
+    base_url: (settings?.base_url || process.env.APP_URL || "").trim().replace(/\/+$/, ""),
     google_client_id: settings?.google_client_id || process.env.GOOGLE_CLIENT_ID || "",
     google_client_secret: settings?.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "",
     google_redirect_uri: settings?.google_redirect_uri || process.env.GOOGLE_REDIRECT_URI || "",
@@ -1236,6 +1236,7 @@ async function startServer() {
     } = req.body;
 
     try {
+      const cleanBaseUrl = (base_url || "").trim().replace(/\/+$/, "");
       db.prepare(`
         UPDATE system_settings SET 
           robokassa_login = ?, 
@@ -1265,7 +1266,7 @@ async function startServer() {
         smtp_port,
         smtp_user,
         smtp_pass,
-        base_url,
+        cleanBaseUrl,
         google_client_id,
         google_client_secret,
         google_redirect_uri,
