@@ -1484,6 +1484,8 @@ const InvoicesView = ({ user }: { user: User }) => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
 
   const fetchInvoices = () => {
     fetch(`/api/invoices/${user.id}`)
@@ -1514,7 +1516,7 @@ const InvoicesView = ({ user }: { user: User }) => {
               <p className="text-zinc-400">Нет загруженных накладных</p>
             </div>
           ) : (
-            invoices.map((inv, i) => (
+            invoices.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((inv, i) => (
               <div 
                 key={i} 
                 onClick={() => setSelectedInvoice(inv)}
@@ -1534,6 +1536,16 @@ const InvoicesView = ({ user }: { user: User }) => {
             ))
           )}
         </div>
+        {invoices.length > pageSize && (
+          <div className="px-6 pb-6">
+            <Pagination 
+              totalItems={invoices.length}
+              pageSize={pageSize}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        )}
       </div>
 
       <AnimatePresence>
@@ -1977,6 +1989,8 @@ const CartView = ({ cart, onUpdateQuantity, onRemove, onPlaceOrder }: {
 const SuppliersView = ({ onSelectSupplier }: { onSelectSupplier: (id: number) => void }) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
 
   useEffect(() => {
     fetch('/api/suppliers')
@@ -2005,7 +2019,7 @@ const SuppliersView = ({ onSelectSupplier }: { onSelectSupplier: (id: number) =>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
-            {suppliers.map(s => (
+            {suppliers.slice((currentPage - 1) * pageSize, currentPage * pageSize).map(s => (
               <tr 
                 key={s.id} 
                 onClick={() => onSelectSupplier(s.id)}
@@ -2055,6 +2069,14 @@ const SuppliersView = ({ onSelectSupplier }: { onSelectSupplier: (id: number) =>
           </tbody>
         </table>
       </div>
+      <div className="p-6 border-t border-zinc-100">
+        <Pagination 
+          totalItems={suppliers.length}
+          pageSize={pageSize}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
+      </div>
     </div>
   );
 };
@@ -2067,6 +2089,8 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }
 }) => {
   const [supplier, setSupplier] = useState<SupplierDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
 
   useEffect(() => {
     fetch(`/api/suppliers/${supplierId}`)
@@ -2136,11 +2160,11 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {supplier.prices.map((p, i) => (
+              {supplier.prices.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((p, i) => (
                 <tr key={i} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-8 py-5 font-bold text-zinc-900">{p.product_name}</td>
+                  <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={p.product_name}>{p.product_name}</td>
                   <td className="px-8 py-5">
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider truncate inline-block max-w-full" title={p.category}>
                       {p.category}
                     </span>
                   </td>
@@ -2159,6 +2183,74 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }
             </tbody>
           </table>
         </div>
+        <div className="p-6 border-t border-zinc-100">
+          <Pagination 
+            totalItems={supplier.prices.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Pagination = ({ 
+  totalItems, 
+  pageSize, 
+  currentPage, 
+  onPageChange 
+}: { 
+  totalItems: number, 
+  pageSize: number, 
+  currentPage: number, 
+  onPageChange: (page: number) => void 
+}) => {
+  const totalPages = Math.ceil(totalItems / pageSize);
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-between px-8 py-4 bg-zinc-50 border-t border-zinc-100">
+      <p className="text-xs text-zinc-500 font-medium">
+        Показано {Math.min(totalItems, (currentPage - 1) * pageSize + 1)}-{Math.min(totalItems, currentPage * pageSize)} из {totalItems}
+      </p>
+      <div className="flex gap-2">
+        <button 
+          disabled={currentPage === 1}
+          onClick={() => onPageChange(currentPage - 1)}
+          className="p-2 rounded-lg hover:bg-zinc-200 disabled:opacity-30 transition-all"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <div className="flex items-center gap-1">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+            if (totalPages > 7) {
+              if (page !== 1 && page !== totalPages && Math.abs(page - currentPage) > 1) {
+                if (page === 2 || page === totalPages - 1) return <span key={page} className="px-1 text-zinc-400">...</span>;
+                return null;
+              }
+            }
+            return (
+              <button
+                key={page}
+                onClick={() => onPageChange(page)}
+                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                  currentPage === page ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-200'
+                }`}
+              >
+                {page}
+              </button>
+            );
+          })}
+        </div>
+        <button 
+          disabled={currentPage === totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+          className="p-2 rounded-lg hover:bg-zinc-200 disabled:opacity-30 transition-all"
+        >
+          <ChevronRight size={16} />
+        </button>
       </div>
     </div>
   );
@@ -2179,6 +2271,9 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
   const [chatTargetId, setChatTargetId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   useEffect(() => {
     if (requestedTab) {
@@ -2196,6 +2291,16 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
       .then(setPrices)
       .catch(err => console.error('Error fetching prices:', err));
   }, []);
+
+  const filteredPrices = prices.filter(p => 
+    p.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.supplier_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const paginatedPrices = user.subscription?.active 
+    ? filteredPrices.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : filteredPrices.slice(0, 3);
 
   const addToCart = (price: PriceRecord) => {
     setCart(prev => {
@@ -2374,8 +2479,8 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                     <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-emerald-100 group hover:border-emerald-300 transition-all">
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <p className="font-bold text-zinc-900 text-lg">{rec.product}</p>
-                          <p className="text-sm text-zinc-500">Поставщик: <span className="text-emerald-600 font-semibold">{rec.supplier}</span></p>
+                          <p className="font-bold text-zinc-900 text-lg truncate max-w-[150px]" title={rec.product}>{rec.product}</p>
+                          <p className="text-sm text-zinc-500">Поставщик: <span className="text-emerald-600 font-semibold truncate inline-block max-w-[100px] align-bottom" title={rec.supplier}>{rec.supplier}</span></p>
                         </div>
                         <span className="bg-emerald-50 text-emerald-600 text-xs font-bold px-2 py-1 rounded-lg">-{rec.savingsPercent}%</span>
                       </div>
@@ -2403,34 +2508,36 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                   <input 
                     type="text" 
                     placeholder="Поиск товара или категории..." 
+                    value={searchQuery}
+                    onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                     className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                   />
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left">
+                <table className="w-full text-left table-fixed">
                   <thead>
                     <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                      <th className="px-8 py-5">Товар</th>
+                      <th className="px-8 py-5 w-1/3">Товар</th>
                       <th className="px-8 py-5">Категория</th>
                       <th className="px-8 py-5">Поставщик</th>
                       <th className="px-8 py-5">Цена</th>
                       <th className="px-8 py-5">Обновлено</th>
-                      <th className="px-8 py-5"></th>
+                      <th className="px-8 py-5 w-40"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 relative">
-                    {prices.slice(0, user.subscription?.active ? undefined : 3).map((p, i) => (
+                    {paginatedPrices.map((p, i) => (
                       <tr 
                         key={i} 
                         onClick={() => setSelectedPrice(p)}
                         className="hover:bg-zinc-50 transition-colors group cursor-pointer"
                       >
-                        <td className="px-8 py-5 font-bold text-zinc-900">{p.product_name}</td>
+                        <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={p.product_name}>{p.product_name}</td>
                         <td className="px-8 py-5">
-                          <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">{p.category}</span>
+                          <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg truncate inline-block max-w-full" title={p.category}>{p.category}</span>
                         </td>
-                        <td className="px-8 py-5 text-sm text-zinc-700 font-medium">{p.supplier_name}</td>
+                        <td className="px-8 py-5 text-sm text-zinc-700 font-medium truncate" title={p.supplier_name}>{p.supplier_name}</td>
                         <td className="px-8 py-5 font-bold text-zinc-900 text-lg">{p.price} ₽</td>
                         <td className="px-8 py-5 text-xs text-zinc-400">{new Date(p.updated_at).toLocaleDateString()}</td>
                         <td className="px-8 py-5 text-right">
@@ -2448,7 +2555,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                         </td>
                       </tr>
                     ))}
-                    {!user.subscription?.active && prices.length > 3 && (
+                    {!user.subscription?.active && filteredPrices.length > 3 && (
                       <>
                         {/* Blurred rows */}
                         {[1, 2, 3].map((_, i) => (
@@ -2487,6 +2594,14 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                   </tbody>
                 </table>
               </div>
+              {user.subscription?.active && (
+                <Pagination 
+                  totalItems={filteredPrices.length}
+                  pageSize={pageSize}
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                />
+              )}
             </div>
           </motion.div>
         )}
@@ -3477,6 +3592,10 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [selectedPrice, setSelectedPrice] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentPageUsers, setCurrentPageUsers] = useState(1);
+  const [currentPageInvoices, setCurrentPageInvoices] = useState(1);
+  const [currentPagePrices, setCurrentPagePrices] = useState(1);
+  const pageSize = 20;
 
   const [confirmData, setConfirmData] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
 
@@ -3617,24 +3736,24 @@ const AdminDashboard = ({ user }: { user: User }) => {
                   {isLoading && <RefreshCw size={20} className="animate-spin text-zinc-400" />}
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left">
+                  <table className="w-full text-left table-fixed">
                     <thead>
                       <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                        <th className="px-8 py-5">ID</th>
-                        <th className="px-8 py-5">ИНН</th>
+                        <th className="px-8 py-5 w-16">ID</th>
+                        <th className="px-8 py-5 w-32">ИНН</th>
                         <th className="px-8 py-5">Название</th>
-                        <th className="px-8 py-5">Тип</th>
-                        <th className="px-8 py-5">Подписка</th>
+                        <th className="px-8 py-5 w-32">Тип</th>
+                        <th className="px-8 py-5 w-32">Подписка</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {users.map((u, i) => {
+                      {users.slice((currentPageUsers - 1) * pageSize, currentPageUsers * pageSize).map((u, i) => {
                         const sub = typeof u.subscription === 'string' ? JSON.parse(u.subscription) : u.subscription;
                         return (
                           <tr key={i} className="hover:bg-zinc-50 transition-colors cursor-pointer" onClick={() => setSelectedUser(u)}>
-                            <td className="px-8 py-5 text-zinc-500">#{u.id}</td>
-                            <td className="px-8 py-5 font-bold text-zinc-900">{u.inn}</td>
-                            <td className="px-8 py-5 font-medium text-zinc-700">{u.name}</td>
+                            <td className="px-8 py-5 text-zinc-500 text-xs">#{u.id}</td>
+                            <td className="px-8 py-5 font-bold text-zinc-900 text-sm">{u.inn}</td>
+                            <td className="px-8 py-5 font-medium text-zinc-700 truncate" title={u.name}>{u.name}</td>
                             <td className="px-8 py-5">
                               <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
                                 u.type === 'admin' ? 'bg-purple-50 text-purple-600' : 
@@ -3660,6 +3779,12 @@ const AdminDashboard = ({ user }: { user: User }) => {
                     </tbody>
                   </table>
                 </div>
+                <Pagination 
+                  totalItems={users.length}
+                  pageSize={pageSize}
+                  currentPage={currentPageUsers}
+                  onPageChange={setCurrentPageUsers}
+                />
               </>
             )}
           </motion.div>
@@ -3677,26 +3802,26 @@ const AdminDashboard = ({ user }: { user: User }) => {
               <h2 className="text-xl font-bold text-zinc-900">Модерация накладных</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table className="w-full text-left table-fixed">
                 <thead>
                   <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
                     <th className="px-8 py-5">Ресторан</th>
                     <th className="px-8 py-5">Поставщик</th>
-                    <th className="px-8 py-5">Сумма</th>
-                    <th className="px-8 py-5">Статус</th>
-                    <th className="px-8 py-5">Дата</th>
-                    <th className="px-8 py-5">Действия</th>
+                    <th className="px-8 py-5 w-32">Сумма</th>
+                    <th className="px-8 py-5 w-32">Статус</th>
+                    <th className="px-8 py-5 w-32">Дата</th>
+                    <th className="px-8 py-5 w-40">Действия</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {invoices.map((inv, i) => (
+                  {invoices.slice((currentPageInvoices - 1) * pageSize, currentPageInvoices * pageSize).map((inv, i) => (
                     <tr 
                       key={i} 
                       onClick={() => setSelectedInvoice(inv)}
                       className="hover:bg-zinc-50 transition-colors cursor-pointer"
                     >
-                      <td className="px-8 py-5 font-bold text-zinc-900">{inv.restaurant_name}</td>
-                      <td className="px-8 py-5 text-zinc-700">{inv.supplier_name}</td>
+                      <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={inv.restaurant_name}>{inv.restaurant_name}</td>
+                      <td className="px-8 py-5 text-zinc-700 truncate" title={inv.supplier_name}>{inv.supplier_name}</td>
                       <td className="px-8 py-5 font-bold text-emerald-600">{inv.amount} ₽</td>
                       <td className="px-8 py-5">
                         <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
@@ -3730,6 +3855,12 @@ const AdminDashboard = ({ user }: { user: User }) => {
                 </tbody>
               </table>
             </div>
+            <Pagination 
+              totalItems={invoices.length}
+              pageSize={pageSize}
+              currentPage={currentPageInvoices}
+              onPageChange={setCurrentPageInvoices}
+            />
           </motion.div>
         )}
 
@@ -3745,27 +3876,27 @@ const AdminDashboard = ({ user }: { user: User }) => {
               <h2 className="text-xl font-bold text-zinc-900">Управление прайсами</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table className="w-full text-left table-fixed">
                 <thead>
                   <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                    <th className="px-8 py-5">Товар</th>
+                    <th className="px-8 py-5 w-1/3">Товар</th>
                     <th className="px-8 py-5">Категория</th>
                     <th className="px-8 py-5">Поставщик</th>
-                    <th className="px-8 py-5">Цена</th>
-                    <th className="px-8 py-5">Обновлено</th>
-                    <th className="px-8 py-5">Действия</th>
+                    <th className="px-8 py-5 w-32">Цена</th>
+                    <th className="px-8 py-5 w-32">Обновлено</th>
+                    <th className="px-8 py-5 w-32">Действия</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {prices.map((p, i) => (
+                  {prices.slice((currentPagePrices - 1) * pageSize, currentPagePrices * pageSize).map((p, i) => (
                     <tr 
                       key={i} 
                       onClick={() => setSelectedPrice(p)}
                       className="hover:bg-zinc-50 transition-colors cursor-pointer"
                     >
-                      <td className="px-8 py-5 font-bold text-zinc-900">{p.product_name}</td>
-                      <td className="px-8 py-5 text-sm text-zinc-500">{p.category}</td>
-                      <td className="px-8 py-5 text-sm text-zinc-700">{p.supplier_name}</td>
+                      <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={p.product_name}>{p.product_name}</td>
+                      <td className="px-8 py-5 text-sm text-zinc-500 truncate" title={p.category}>{p.category}</td>
+                      <td className="px-8 py-5 text-sm text-zinc-700 truncate" title={p.supplier_name}>{p.supplier_name}</td>
                       <td className="px-8 py-5 font-bold text-zinc-900">{p.price} ₽</td>
                       <td className="px-8 py-5 text-xs text-zinc-400">{new Date(p.updated_at).toLocaleDateString()}</td>
                       <td className="px-8 py-5">
@@ -3781,6 +3912,12 @@ const AdminDashboard = ({ user }: { user: User }) => {
                 </tbody>
               </table>
             </div>
+            <Pagination 
+              totalItems={prices.length}
+              pageSize={pageSize}
+              currentPage={currentPagePrices}
+              onPageChange={setCurrentPagePrices}
+            />
           </motion.div>
         )}
 
@@ -3828,6 +3965,9 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [stats, setStats] = useState({ productCount: 0, orderCount: 0, totalVolume: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPageOrders, setCurrentPageOrders] = useState(1);
+  const pageSize = 20;
 
   const fetchStats = () => {
     fetch(`/api/supplier/${user.id}/stats`)
@@ -4132,10 +4272,10 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                 </button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left">
+                <table className="w-full text-left table-fixed">
                   <thead>
                     <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                      <th className="px-8 py-5">Товар</th>
+                      <th className="px-8 py-5 w-1/3">Товар</th>
                       <th className="px-8 py-5">Категория</th>
                       <th className="px-8 py-5">Цена</th>
                       <th className="px-8 py-5">Ед. изм.</th>
@@ -4144,10 +4284,10 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100">
-                    {prices.length > 0 ? prices.map((p, i) => (
+                    {prices.length > 0 ? prices.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((p, i) => (
                       <tr key={i} className="hover:bg-zinc-50 transition-colors">
-                        <td className="px-8 py-5 font-bold text-zinc-900">{p.product_name}</td>
-                        <td className="px-8 py-5 text-sm text-zinc-500">{p.category}</td>
+                        <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={p.product_name}>{p.product_name}</td>
+                        <td className="px-8 py-5 text-sm text-zinc-500 truncate" title={p.category}>{p.category}</td>
                         <td className="px-8 py-5 font-bold text-zinc-900">{p.price} ₽</td>
                         <td className="px-8 py-5 text-zinc-500">{p.unit}</td>
                         <td className="px-8 py-5 text-xs text-zinc-400">{new Date(p.updated_at).toLocaleDateString()}</td>
@@ -4170,6 +4310,12 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                   </tbody>
                 </table>
               </div>
+              <Pagination 
+                totalItems={prices.length}
+                pageSize={pageSize}
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+              />
             </div>
           </motion.div>
         )}
@@ -4209,22 +4355,22 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                 <h2 className="text-xl font-bold text-zinc-900">Управление заказами</h2>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left">
+                <table className="w-full text-left table-fixed">
                   <thead>
                     <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                      <th className="px-8 py-5">ID Заказа</th>
+                      <th className="px-8 py-5 w-32">ID Заказа</th>
                       <th className="px-8 py-5">Ресторан</th>
-                      <th className="px-8 py-5">Дата</th>
-                      <th className="px-8 py-5">Сумма</th>
-                      <th className="px-8 py-5">Статус</th>
-                      <th className="px-8 py-5">Действия</th>
+                      <th className="px-8 py-5 w-32">Дата</th>
+                      <th className="px-8 py-5 w-32">Сумма</th>
+                      <th className="px-8 py-5 w-32">Статус</th>
+                      <th className="px-8 py-5 w-32">Действия</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100">
-                    {orders.map((order) => (
+                    {orders.slice((currentPageOrders - 1) * pageSize, currentPageOrders * pageSize).map((order) => (
                       <tr key={order.id} className="hover:bg-zinc-50 transition-colors">
-                        <td className="px-8 py-5 font-mono text-sm font-bold text-zinc-900">{order.id}</td>
-                        <td className="px-8 py-5 font-bold text-zinc-900">{order.restaurant}</td>
+                        <td className="px-8 py-5 font-mono text-sm font-bold text-zinc-900">#{order.id}</td>
+                        <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={order.restaurant}>{order.restaurant}</td>
                         <td className="px-8 py-5 text-sm text-zinc-500">{order.date}</td>
                         <td className="px-8 py-5 font-bold text-zinc-900">{order.total.toLocaleString()} ₽</td>
                         <td className="px-8 py-5">
@@ -4247,6 +4393,12 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                   </tbody>
                 </table>
               </div>
+              <Pagination 
+                totalItems={orders.length}
+                pageSize={pageSize}
+                currentPage={currentPageOrders}
+                onPageChange={setCurrentPageOrders}
+              />
             </div>
           </motion.div>
         )}
