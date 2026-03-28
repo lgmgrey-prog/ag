@@ -3366,11 +3366,29 @@ const UserDetailView = ({ user, onBack, onUpdate }: { user: any, onBack: () => v
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-zinc-500 ml-1">Статус</label>
                   <select 
-                    value={formData.subscription.status}
-                    onChange={e => setFormData({ 
-                      ...formData, 
-                      subscription: { ...formData.subscription, status: e.target.value } 
-                    })}
+                    value={formData.subscription.status || (formData.subscription.active ? 'active' : 'none')}
+                    onChange={e => {
+                      const status = e.target.value;
+                      const isActive = status === 'active' || status === 'trial';
+                      let expiresAt = formData.subscription.expiresAt;
+                      
+                      // If activating and no date set, set to 1 month from now
+                      if (isActive && !expiresAt) {
+                        const date = new Date();
+                        date.setMonth(date.getMonth() + 1);
+                        expiresAt = date.toISOString();
+                      }
+
+                      setFormData({ 
+                        ...formData, 
+                        subscription: { 
+                          ...formData.subscription, 
+                          status,
+                          active: isActive,
+                          expiresAt
+                        } 
+                      });
+                    }}
                     className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                   >
                     <option value="none">Нет подписки</option>
