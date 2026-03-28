@@ -159,6 +159,19 @@ try {
 } catch (e) {}
 
 try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS global_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
+  const existingOffer = db.prepare("SELECT * FROM global_settings WHERE key = 'public_offer'").get();
+  if (!existingOffer) {
+    db.prepare("INSERT INTO global_settings (key, value) VALUES (?, ?)").run('public_offer', '# Публичная оферта\n\nЗдесь будет текст вашей оферты. Вы можете редактировать его в панели администратора.');
+  }
+} catch (e) {}
+
+try {
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_product ON price_lists(supplier_id, product_id)");
 } catch (e) {}
 
@@ -210,6 +223,8 @@ defaultTemplates.forEach(t => {
 // Helper to get system settings
 function getSystemSettings() {
   const settings = db.prepare("SELECT * FROM system_settings WHERE id = 1").get() as any;
+  const publicOffer = db.prepare("SELECT value FROM global_settings WHERE key = 'public_offer'").get() as any;
+  
   return {
     robokassa_login: settings?.robokassa_login || process.env.ROBOKASSA_LOGIN || "test_merchant",
     robokassa_pass1: settings?.robokassa_pass1 || process.env.ROBOKASSA_PASS1 || "pass1",
@@ -226,7 +241,8 @@ function getSystemSettings() {
     google_redirect_uri: settings?.google_redirect_uri || process.env.GOOGLE_REDIRECT_URI || "",
     session_secret: settings?.session_secret || process.env.SESSION_SECRET || "secret-key",
     gemini_api_key: settings?.gemini_api_key || process.env.GEMINI_API_KEY || "",
-    smtp_from: settings?.smtp_from || process.env.SMTP_FROM || "no-reply@restcost.ru"
+    smtp_from: settings?.smtp_from || process.env.SMTP_FROM || "no-reply@restcost.ru",
+    public_offer: publicOffer?.value || ""
   };
 }
 
@@ -1171,6 +1187,30 @@ async function startServer() {
     }
   });
 
+  app.get("/api/settings/:key", (req, res) => {
+    const { key } = req.params;
+    try {
+      const setting = db.prepare("SELECT value FROM global_settings WHERE key = ?").get(key);
+      res.json({ value: setting ? (setting as any).value : "" });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch setting" });
+    }
+  });
+
+  app.post("/api/settings/:key", (req, res) => {
+    const { key } = req.params;
+    const { value } = req.body;
+    if (req.session?.user?.type !== 'admin') {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      db.prepare("INSERT OR REPLACE INTO global_settings (key, value) VALUES (?, ?)").run(key, value);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update setting" });
+    }
+  });
+
   app.post("/api/invoices", (req, res) => {
     const { restaurant_id, supplier_id, amount, image_url } = req.body;
     try {
@@ -1192,7 +1232,7 @@ async function startServer() {
       robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, 
       datanewton_api_key, smtp_host, smtp_port, smtp_user, smtp_pass, base_url,
       google_client_id, google_client_secret, google_redirect_uri, session_secret, gemini_api_key,
-      smtp_from
+      smtp_from, public_offer
     } = req.body;
 
     try {
@@ -1233,6 +1273,11 @@ async function startServer() {
         gemini_api_key,
         smtp_from
       );
+
+      if (public_offer !== undefined) {
+        db.prepare("INSERT OR REPLACE INTO global_settings (key, value) VALUES (?, ?)").run('public_offer', public_offer);
+      }
+
       res.json({ success: true });
     } catch (err) {
       console.error("Update settings error:", err);

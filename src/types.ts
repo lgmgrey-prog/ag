@@ -13,9 +13,12 @@ export interface User {
 }
 
 export interface PriceRecord {
+  id?: number;
   product_name: string;
   supplier_name: string;
+  supplier_id?: number;
   price: number;
+  unit?: string;
   updated_at: string;
   category: string;
 }

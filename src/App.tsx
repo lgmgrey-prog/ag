@@ -46,6 +46,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
 import { analyzePrices, recognizeInvoice } from './services/geminiService';
 import { SupplierImport } from './components/SupplierImport';
@@ -2196,6 +2197,68 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }
   );
 };
 
+const PublicOfferModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  const [content, setContent] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLoading(true);
+      fetch('/api/settings/public_offer')
+        .then(res => res.json())
+        .then(data => {
+          setContent(data.value);
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    }
+  }, [isOpen]);
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm"
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative w-full max-w-4xl max-h-[80vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+          >
+            <div className="p-6 border-b border-zinc-100 flex justify-between items-center bg-white sticky top-0 z-10">
+              <h2 className="text-xl font-bold text-zinc-900">Публичная оферта</h2>
+              <button onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-xl transition-colors text-zinc-400 hover:text-zinc-900">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-8 overflow-y-auto prose prose-zinc max-w-none prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-p:text-zinc-600 prose-strong:text-zinc-900 prose-a:text-emerald-600 hover:prose-a:text-emerald-700">
+              {loading ? (
+                <div className="py-20 text-center text-zinc-400">Загрузка текста оферты...</div>
+              ) : (
+                <ReactMarkdown>{content}</ReactMarkdown>
+              )}
+            </div>
+            <div className="p-6 border-t border-zinc-100 bg-zinc-50 flex justify-end">
+              <button 
+                onClick={onClose}
+                className="px-8 py-3 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200"
+              >
+                Закрыть
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 const Pagination = ({ 
   totalItems, 
   pageSize, 
@@ -2731,7 +2794,7 @@ const SystemSettingsView = () => {
   const [templates, setTemplates] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'payments' | 'api' | 'email' | 'logs'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'payments' | 'api' | 'email' | 'logs' | 'offer'>('general');
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -2876,6 +2939,7 @@ const SystemSettingsView = () => {
             { id: 'payments', label: 'Оплата', icon: CreditCard },
             { id: 'api', label: 'API Ключи', icon: Zap },
             { id: 'email', label: 'Email', icon: Mail },
+            { id: 'offer', label: 'Оферта', icon: FileText },
             { id: 'logs', label: 'Логи Email', icon: FileText }
           ].map(tab => (
             <button
@@ -3232,6 +3296,31 @@ const SystemSettingsView = () => {
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'offer' && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-6"
+            >
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <FileText size={20} className="text-amber-500" />
+                  Публичная оферта
+                </h3>
+                <p className="text-sm text-zinc-500">Текст оферты в формате Markdown. Он будет отображаться пользователям по ссылке в футере.</p>
+                <div className="space-y-1.5">
+                  <textarea 
+                    value={settings.public_offer || ''}
+                    onChange={e => setSettings({...settings, public_offer: e.target.value})}
+                    rows={15}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-sm"
+                    placeholder="# Заголовок\n\nТекст оферты..."
+                  />
                 </div>
               </div>
             </motion.div>
@@ -3954,7 +4043,7 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
   onTabHandled?: () => void,
   showToast?: (m: string, t?: 'success' | 'error') => void
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat' | 'import'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat' | 'import' | 'settings'>('dashboard');
   const [integration, setIntegration] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [show1cPass, setShow1cPass] = useState(false);
@@ -4876,6 +4965,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isOfferOpen, setIsOfferOpen] = useState(false);
   const [requestedTab, setRequestedTab] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -4989,6 +5079,11 @@ export default function App() {
         user={user}
       />
 
+      <PublicOfferModal 
+        isOpen={isOfferOpen}
+        onClose={() => setIsOfferOpen(false)}
+      />
+
       {/* Footer */}
       <footer className="border-t border-zinc-100 py-12 bg-zinc-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -5000,10 +5095,10 @@ export default function App() {
               <span className="font-bold tracking-tight text-zinc-900">Агрегатор</span>
             </div>
             <div className="flex gap-8 text-sm text-zinc-500 font-medium">
+              <button onClick={() => setIsOfferOpen(true)} className="hover:text-zinc-900">Публичная оферта</button>
               <a href="#" className="hover:text-zinc-900">О сервисе</a>
               <a href="#" className="hover:text-zinc-900">Тарифы</a>
               <a href="#" className="hover:text-zinc-900">Помощь</a>
-              <a href="#" className="hover:text-zinc-900">Контакты</a>
             </div>
             <p className="text-xs text-zinc-400">© 2026 Агрегатор HoReCa. Все права защищены.</p>
           </div>
