@@ -15,6 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const db = new Database("procurehub.db");
+db.exec("PRAGMA foreign_keys = ON;");
 
 // Initialize database
 db.exec(`
@@ -183,13 +184,13 @@ db.exec(`
 const defaultTemplates = [
   {
     id: 'welcome',
-    subject: 'Добро пожаловать в ProcureHub',
-    body: '<p>Добро пожаловать в <b>ProcureHub</b>!</p><p>Ваш временный пароль для входа: <b>{{password}}</b></p><p><a href="{{base_url}}">Войти в систему</a></p>',
+    subject: 'Добро пожаловать в RestCost',
+    body: '<p>Добро пожаловать в <b>RestCost</b>!</p><p>Ваш временный пароль для входа: <b>{{password}}</b></p><p><a href="{{base_url}}">Войти в систему</a></p>',
     description: 'Письмо при регистрации нового пользователя'
   },
   {
     id: 'password_reset',
-    subject: 'Восстановление пароля ProcureHub',
+    subject: 'Восстановление пароля RestCost',
     body: '<p>Вы запросили восстановление пароля.</p><p>Ваш новый пароль: <b>{{password}}</b></p><p><a href="{{base_url}}">Войти в систему</a></p>',
     description: 'Письмо при восстановлении пароля'
   },
@@ -1375,10 +1376,20 @@ async function startServer() {
   app.delete("/api/admin/users/:id", (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare("DELETE FROM users WHERE id = ?").run(id);
+      // Clean up all related data
+      db.transaction(() => {
+        db.prepare("DELETE FROM restaurant_products WHERE restaurant_id = ?").run(id);
+        db.prepare("DELETE FROM price_lists WHERE supplier_id = ?").run(id);
+        db.prepare("DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?").run(id, id);
+        db.prepare("DELETE FROM invoices WHERE restaurant_id = ? OR supplier_id = ?").run(id, id);
+        db.prepare("DELETE FROM integrations WHERE user_id = ?").run(id);
+        db.prepare("DELETE FROM orders WHERE restaurant_id = ? OR supplier_id = ?").run(id, id);
+        db.prepare("DELETE FROM users WHERE id = ?").run(id);
+      })();
       res.json({ success: true });
     } catch (err) {
-      res.status(500).json({ error: "Failed to delete user" });
+      console.error('Delete user error:', err);
+      res.status(500).json({ error: "Failed to delete user and related data" });
     }
   });
 
