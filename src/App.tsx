@@ -2139,16 +2139,25 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }
               </div>
             </div>
           </div>
-          <button 
-            onClick={() => onWriteMessage(supplier.id)}
-            className="bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200"
-          >
-            Написать сообщение
-          </button>
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={() => onWriteMessage(supplier.id)}
+              className="bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200 w-full"
+            >
+              Написать сообщение
+            </button>
+            <button 
+              onClick={() => document.getElementById('price-list-section')?.scrollIntoView({ behavior: 'smooth' })}
+              className="bg-emerald-50 text-emerald-600 px-8 py-4 rounded-2xl font-bold hover:bg-emerald-100 transition-all w-full flex items-center justify-center gap-2"
+            >
+              <Package size={18} />
+              Посмотреть прайс
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+      <div id="price-list-section" className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
         <div className="p-6 border-b border-zinc-100">
           <h3 className="font-bold text-zinc-900 text-xl">Прайс-лист</h3>
         </div>
@@ -2809,6 +2818,8 @@ const SystemSettingsView = () => {
   const [testRecipient, setTestRecipient] = useState('');
   const [isTestingEmail, setIsTestingEmail] = useState(false);
   const [testEmailResult, setTestEmailResult] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [isTestingGemini, setIsTestingGemini] = useState(false);
+  const [testGeminiResult, setTestGeminiResult] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
   const toggleSecret = (key: string) => {
     setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }));
@@ -2871,6 +2882,35 @@ const SystemSettingsView = () => {
       setTestEmailResult({ text: 'Ошибка сети при отправке теста', type: 'error' });
     } finally {
       setIsTestingEmail(false);
+    }
+  };
+
+  const handleTestGemini = async () => {
+    if (!settings.gemini_api_key) {
+      setTestGeminiResult({ text: 'Введите API ключ Gemini', type: 'error' });
+      return;
+    }
+    setIsTestingGemini(true);
+    setTestGeminiResult(null);
+    try {
+      const res = await fetch('/api/admin/settings/test-gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gemini_api_key: settings.gemini_api_key })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTestGeminiResult({ text: data.message, type: 'success' });
+      } else {
+        setTestGeminiResult({ 
+          text: data.error + (data.details ? ': ' + data.details : ''), 
+          type: 'error' 
+        });
+      }
+    } catch (err) {
+      setTestGeminiResult({ text: 'Ошибка сети при проверке API ключа', type: 'error' });
+    } finally {
+      setIsTestingGemini(false);
     }
   };
 
@@ -3110,15 +3150,33 @@ const SystemSettingsView = () => {
                   <Zap size={20} className="text-blue-500" />
                   Gemini AI API
                 </h3>
-                <PasswordInput 
-                  label="Gemini API Key"
-                  value={settings.gemini_api_key}
-                  onChange={v => setSettings({...settings, gemini_api_key: v})}
-                  placeholder="Введите ваш Gemini API ключ"
-                  show={showSecrets['gemini_api_key']}
-                  onToggle={() => toggleSecret('gemini_api_key')}
-                  required={false}
-                />
+                <div className="space-y-4">
+                  <PasswordInput 
+                    label="Gemini API Key"
+                    value={settings.gemini_api_key}
+                    onChange={v => setSettings({...settings, gemini_api_key: v})}
+                    placeholder="Введите ваш Gemini API ключ"
+                    show={showSecrets['gemini_api_key']}
+                    onToggle={() => toggleSecret('gemini_api_key')}
+                    required={false}
+                  />
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={handleTestGemini}
+                      disabled={isTestingGemini}
+                      className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {isTestingGemini ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+                      Проверить ключ
+                    </button>
+                    {testGeminiResult && (
+                      <span className={`text-[10px] font-bold ${testGeminiResult.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {testGeminiResult.text}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <p className="text-[10px] text-zinc-400 -mt-3">Используется для анализа цен и распознавания накладных.</p>
               </div>
 
@@ -3471,6 +3529,23 @@ const UserDetailView = ({ user, onBack, onUpdate }: { user: any, onBack: () => v
     subscription: typeof user.subscription === 'string' ? JSON.parse(user.subscription) : user.subscription || { status: 'none', plan: 'none' }
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [showPriceList, setShowPriceList] = useState(false);
+  const [prices, setPrices] = useState<PriceRecord[]>([]);
+  const [loadingPrices, setLoadingPrices] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
+
+  useEffect(() => {
+    if (showPriceList && user.id) {
+      setLoadingPrices(true);
+      fetch(`/api/supplier/${user.id}/prices`)
+        .then(res => res.json())
+        .then(data => {
+          setPrices(data);
+          setLoadingPrices(false);
+        });
+    }
+  }, [showPriceList, user.id]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -3513,6 +3588,15 @@ const UserDetailView = ({ user, onBack, onUpdate }: { user: any, onBack: () => v
               className="px-6 py-2 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 transition-all"
             >
               Удалить
+            </button>
+          )}
+          {user.type === 'supplier' && (
+            <button 
+              onClick={() => setShowPriceList(true)}
+              className="px-6 py-2 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all flex items-center gap-2"
+            >
+              <Package size={18} />
+              Посмотреть прайс
             </button>
           )}
           <button 
@@ -3682,6 +3766,75 @@ const UserDetailView = ({ user, onBack, onUpdate }: { user: any, onBack: () => v
           </div>
         </div>
       </div>
+
+      {showPriceList && (
+        <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col shadow-2xl"
+          >
+            <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-zinc-900">Прайс-лист поставщика</h3>
+                <p className="text-zinc-500 text-sm">{user.name}</p>
+              </div>
+              <button 
+                onClick={() => setShowPriceList(false)}
+                className="p-2 hover:bg-zinc-100 rounded-full transition-colors"
+              >
+                <X size={24} className="text-zinc-400" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              {loadingPrices ? (
+                <div className="p-20 text-center text-zinc-400">Загрузка товаров...</div>
+              ) : prices.length === 0 ? (
+                <div className="p-20 text-center text-zinc-400">Прайс-лист пуст</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                        <th className="px-8 py-5">Товар</th>
+                        <th className="px-8 py-5">Категория</th>
+                        <th className="px-8 py-5">Цена</th>
+                        <th className="px-8 py-5 text-right">Ед. изм.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {prices.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((p, i) => (
+                        <tr key={i} className="hover:bg-zinc-50 transition-colors">
+                          <td className="px-8 py-4 font-bold text-zinc-900 truncate" title={p.product_name}>{p.product_name}</td>
+                          <td className="px-8 py-4">
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                              {p.category}
+                            </span>
+                          </td>
+                          <td className="px-8 py-4 font-bold text-zinc-900">{p.price} ₽</td>
+                          <td className="px-8 py-4 text-zinc-500 text-right">{p.unit}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            
+            {prices.length > pageSize && (
+              <div className="p-6 border-t border-zinc-100">
+                <Pagination 
+                  totalItems={prices.length}
+                  pageSize={pageSize}
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
@@ -4244,9 +4397,17 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                 <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Всего заказов</p>
                 <p className="text-4xl font-bold text-zinc-900">{stats.orderCount}</p>
               </div>
-              <div className="bg-white border border-zinc-200 rounded-3xl p-6">
-                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Товаров в прайсе</p>
-                <p className="text-4xl font-bold text-zinc-900">{stats.productCount}</p>
+              <div className="bg-white border border-zinc-200 rounded-3xl p-6 flex flex-col justify-between">
+                <div>
+                  <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Товаров в прайсе</p>
+                  <p className="text-4xl font-bold text-zinc-900">{stats.productCount}</p>
+                </div>
+                <button 
+                  onClick={() => setActiveTab('prices')}
+                  className="mt-4 flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-colors"
+                >
+                  Управление прайсом <ArrowRight size={16} />
+                </button>
               </div>
               <div className="bg-zinc-900 text-white rounded-3xl p-6">
                 <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Объем продаж</p>

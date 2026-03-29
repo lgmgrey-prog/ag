@@ -1227,6 +1227,37 @@ async function startServer() {
     res.json(settings);
   });
 
+  app.post("/api/admin/settings/test-gemini", async (req, res) => {
+    const { gemini_api_key } = req.body;
+    if (!gemini_api_key) {
+      return res.status(400).json({ error: "API ключ не предоставлен" });
+    }
+
+    try {
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: gemini_api_key });
+      
+      // Simple test prompt
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: "Hello, respond with 'OK' if you can hear me."
+      });
+      const text = result.text;
+      
+      if (text && text.includes("OK")) {
+        res.json({ success: true, message: "API ключ успешно проверен! ИИ работает корректно." });
+      } else {
+        res.json({ success: true, message: "API ключ принят, но ответ ИИ был неожиданным: " + text });
+      }
+    } catch (error: any) {
+      console.error("Gemini test error:", error);
+      res.status(500).json({ 
+        error: "Ошибка при проверке API ключа", 
+        details: error.message 
+      });
+    }
+  });
+
   app.post("/api/admin/settings", (req, res) => {
     const { 
       robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, 
