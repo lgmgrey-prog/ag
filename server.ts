@@ -1251,9 +1251,19 @@ async function startServer() {
       }
     } catch (error: any) {
       console.error("Gemini test error:", error);
+      let errorMessage = error.message || "Неизвестная ошибка";
+      
+      // Handle specific location error from Google Gemini API
+      const errorStr = JSON.stringify(error);
+      if (errorMessage.includes("User location is not supported") || errorStr.includes("User location is not supported")) {
+        errorMessage = "Ошибка: Регион вашего сервера (IP-адрес) не поддерживается Google Gemini API. Google ограничивает доступ к ИИ в некоторых странах. Решение: используйте прокси-сервер или перенесите сервер в поддерживаемый регион (Европа, США и др.).";
+      } else if (errorMessage.includes("API key not valid") || errorStr.includes("API key not valid")) {
+        errorMessage = "Ошибка: Неверный API ключ. Пожалуйста, проверьте правильность введенного ключа в настройках Google AI Studio.";
+      }
+
       res.status(500).json({ 
         error: "Ошибка при проверке API ключа", 
-        details: error.message 
+        details: errorMessage 
       });
     }
   });
