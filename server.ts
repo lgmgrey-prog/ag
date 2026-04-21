@@ -10,6 +10,7 @@ import crypto from "crypto";
 import { google } from "googleapis";
 import cookieSession from "cookie-session";
 import xlsx from "xlsx";
+import { GoogleGenAI } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,6 +43,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS restaurant_products (
     restaurant_id INTEGER,
     product_id INTEGER,
+    current_price REAL DEFAULT 0,
     PRIMARY KEY(restaurant_id, product_id),
     FOREIGN KEY(restaurant_id) REFERENCES users(id),
     FOREIGN KEY(product_id) REFERENCES products(id)
@@ -135,6 +137,13 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Migration: Add current_price to restaurant_products if it doesn't exist
+try {
+  db.prepare("ALTER TABLE restaurant_products ADD COLUMN current_price REAL DEFAULT 0").run();
+} catch (e) {
+  // Column already exists or table doesn't exist yet
+}
 
 // Migration: Add columns if they don't exist
 try {
@@ -394,6 +403,24 @@ function generateRobokassaUrl(invId: number, outSum: number, description: string
 
 async function startServer() {
   const app = express();
+  app.set('trust proxy', 1);
+  
+  // Prevent browser caching of redirects and handle accidental localhost redirects
+  app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
+    // If somehow a request with host 'localhost' hits the server (unlikely in this env, but for safety)
+    if (req.headers.host && req.headers.host.includes('localhost:3000')) {
+      const settings = getSystemSettings();
+      if (settings.base_url && !settings.base_url.includes('localhost')) {
+        return res.redirect(302, settings.base_url + req.url);
+      }
+    }
+    next();
+  });
+
   app.use(express.json({ limit: '10mb' }));
 
   app.use(cookieSession({
@@ -523,8 +550,8 @@ async function startServer() {
       const params: any[] = [];
 
       if (restaurantId) {
-        query += " JOIN restaurant_products rp ON p.id = rp.product_id WHERE rp.restaurant_id = ?";
-        countQuery += " JOIN restaurant_products rp ON p.id = rp.product_id WHERE rp.restaurant_id = ?";
+        query = "SELECT p.*, rp.current_price FROM products p JOIN restaurant_products rp ON p.id = rp.product_id WHERE rp.restaurant_id = ?";
+        countQuery = "SELECT COUNT(*) as total FROM products p JOIN restaurant_products rp ON p.id = rp.product_id WHERE rp.restaurant_id = ?";
         params.push(restaurantId);
       }
 
@@ -549,6 +576,34 @@ async function startServer() {
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  app.patch("/api/restaurant/products/:productId", (req, res) => {
+    const { restaurantId, currentPrice } = req.body;
+    const { productId } = req.params;
+    try {
+      db.prepare("UPDATE restaurant_products SET current_price = ? WHERE restaurant_id = ? AND product_id = ?")
+        .run(currentPrice, restaurantId, productId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update product price" });
+    }
+  });
+
+  app.post("/api/restaurant/products", (req, res) => {
+    const { restaurantId, name, category, unit, currentPrice } = req.body;
+    try {
+      db.prepare("INSERT OR IGNORE INTO products (name, category, unit) VALUES (?, ?, ?)")
+        .run(name, category || 'Без категории', unit || 'шт');
+      const product = db.prepare("SELECT id FROM products WHERE name = ?").get(name) as any;
+      if (product) {
+        db.prepare("INSERT OR REPLACE INTO restaurant_products (restaurant_id, product_id, current_price) VALUES (?, ?, ?)")
+          .run(restaurantId, product.id, currentPrice || 0);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to add product" });
     }
   });
 
@@ -1229,36 +1284,48 @@ async function startServer() {
 
   app.post("/api/admin/settings/test-gemini", async (req, res) => {
     const { gemini_api_key } = req.body;
+    console.log("Testing Gemini API key...");
+    
     if (!gemini_api_key) {
+      console.log("Test failed: No API key provided");
       return res.status(400).json({ error: "API ключ не предоставлен" });
     }
 
     try {
-      const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({ apiKey: gemini_api_key });
       
-      // Simple test prompt
-      const result = await ai.models.generateContent({
+      console.log("Sending test request to Gemini...");
+      // Simple test prompt with a timeout
+      const requestPromise = ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: "Hello, respond with 'OK' if you can hear me."
       });
+
+      // 30-second timeout for the AI request
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout: Gemini API took too long to respond")), 30000)
+      );
+
+      const result = await (Promise.race([requestPromise, timeoutPromise]) as Promise<any>);
       const text = result.text;
+      console.log("Gemini response received:", text);
       
-      if (text && text.includes("OK")) {
+      if (text && text.toLowerCase().includes("ok")) {
         res.json({ success: true, message: "API ключ успешно проверен! ИИ работает корректно." });
       } else {
-        res.json({ success: true, message: "API ключ принят, но ответ ИИ был неожиданным: " + text });
+        res.json({ success: true, message: "API ключ принят, но ответ ИИ был необычным: " + text });
       }
     } catch (error: any) {
-      console.error("Gemini test error:", error);
+      console.error("Gemini test error detail:", error);
       let errorMessage = error.message || "Неизвестная ошибка";
       
-      // Handle specific location error from Google Gemini API
       const errorStr = JSON.stringify(error);
       if (errorMessage.includes("User location is not supported") || errorStr.includes("User location is not supported")) {
-        errorMessage = "Ошибка: Регион вашего сервера (IP-адрес) не поддерживается Google Gemini API. Google ограничивает доступ к ИИ в некоторых странах. Решение: используйте прокси-сервер или перенесите сервер в поддерживаемый регион (Европа, США и др.).";
+        errorMessage = "Ваш регион (Германия/EU) не поддерживается в данной конфигурации API. Попробуйте создать ключ в Google AI Studio с включенным VPN США или проверьте настройки региона.";
       } else if (errorMessage.includes("API key not valid") || errorStr.includes("API key not valid")) {
-        errorMessage = "Ошибка: Неверный API ключ. Пожалуйста, проверьте правильность введенного ключа в настройках Google AI Studio.";
+        errorMessage = "Неверный API ключ. Проверьте его в Google AI Studio.";
+      } else if (errorMessage.includes("Timeout")) {
+        errorMessage = "Сервер Google не ответил в течение 30 секунд. Возможно, есть проблемы с сетевым подключением на сервере.";
       }
 
       res.status(500).json({ 

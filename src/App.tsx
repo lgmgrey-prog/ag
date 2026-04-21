@@ -1746,6 +1746,11 @@ const CatalogView = ({ user }: { user: User }) => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newProduct, setNewProduct] = useState({ name: '', category: '', unit: 'кг', currentPrice: '' });
+  const [editingPrice, setEditingPrice] = useState<{ id: number, price: string } | null>(null);
+  const [analyzingId, setAnalyzingId] = useState<number | null>(null);
+  const [bestOffer, setBestOffer] = useState<{ productId: number, offer: any } | null>(null);
   const limit = 15;
 
   const fetchProducts = useCallback(() => {
@@ -1775,6 +1780,74 @@ const CatalogView = ({ user }: { user: User }) => {
     fetchProducts();
   }, [fetchProducts]);
 
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/restaurant/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: user.id,
+          ...newProduct,
+          currentPrice: parseFloat(newProduct.currentPrice) || 0
+        })
+      });
+      if (res.ok) {
+        setShowAddModal(false);
+        setNewProduct({ name: '', category: '', unit: 'кг', currentPrice: '' });
+        fetchProducts();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdatePrice = async (productId: number, price: string) => {
+    try {
+      const res = await fetch(`/api/restaurant/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: user.id,
+          currentPrice: parseFloat(price) || 0
+        })
+      });
+      if (res.ok) {
+        setEditingPrice(null);
+        fetchProducts();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const findBestOffer = async (product: any) => {
+    setAnalyzingId(product.id);
+    setBestOffer(null);
+    try {
+      // Fetch all market prices for this product name
+      const res = await fetch('/api/prices');
+      const allPrices: PriceRecord[] = await res.json();
+      
+      // Simple matching by name (can be improved with AI)
+      const matches = allPrices.filter(p => 
+        p.product_name.toLowerCase().includes(product.name.toLowerCase()) ||
+        product.name.toLowerCase().includes(p.product_name.toLowerCase())
+      );
+
+      if (matches.length > 0) {
+        const best = matches.reduce((prev, curr) => prev.price < curr.price ? prev : curr);
+        setBestOffer({ productId: product.id, offer: best });
+      } else {
+        setBestOffer({ productId: product.id, offer: null });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAnalyzingId(null);
+    }
+  };
+
   // Reset to page 1 when searching
   useEffect(() => {
     setPage(1);
@@ -1784,20 +1857,28 @@ const CatalogView = ({ user }: { user: User }) => {
     <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
       <div className="p-6 border-b border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-zinc-900">Ваш каталог iiko</h2>
+          <h2 className="text-xl font-bold text-zinc-900">Ваш каталог товаров</h2>
           <p className="text-sm text-zinc-500">
-            {total > 0 ? `Найдено ${total} товаров` : 'Товары, синхронизированные из вашей системы iiko'}
+            {total > 0 ? `Найдено ${total} товаров` : 'Товары вашей организации'}
           </p>
         </div>
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-          <input 
-            type="text" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Поиск в вашем каталоге..." 
-            className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-          />
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+            <input 
+              type="text" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Поиск в каталоге..." 
+              className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            />
+          </div>
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="bg-zinc-900 text-white p-2.5 rounded-xl hover:bg-zinc-800 transition-all shadow-sm flex items-center gap-2 px-4"
+          >
+            <Plus size={20} /> <span className="hidden sm:inline">Добавить</span>
+          </button>
         </div>
       </div>
       
@@ -1823,17 +1904,99 @@ const CatalogView = ({ user }: { user: User }) => {
                   <th className="px-8 py-5">Название</th>
                   <th className="px-8 py-5">Категория</th>
                   <th className="px-8 py-5">Ед. изм.</th>
+                  <th className="px-8 py-5">Ваша цена</th>
+                  <th className="px-8 py-5 text-right">Действия</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {products.map((p, i) => (
-                  <tr key={i} className="hover:bg-zinc-50 transition-colors">
-                    <td className="px-8 py-5 font-bold text-zinc-900">{p.name}</td>
-                    <td className="px-8 py-5">
-                      <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">{p.category}</span>
-                    </td>
-                    <td className="px-8 py-5 text-sm text-zinc-500">{p.unit}</td>
-                  </tr>
+                  <React.Fragment key={p.id}>
+                    <tr className="hover:bg-zinc-50 transition-colors group">
+                      <td className="px-8 py-5 font-bold text-zinc-900">{p.name}</td>
+                      <td className="px-8 py-5">
+                        <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">{p.category}</span>
+                      </td>
+                      <td className="px-8 py-5 text-sm text-zinc-500">{p.unit}</td>
+                      <td className="px-8 py-5">
+                        {editingPrice?.id === p.id ? (
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="number"
+                              value={editingPrice.price}
+                              onChange={(e) => setEditingPrice({ ...editingPrice, price: e.target.value })}
+                              className="w-24 px-2 py-1 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleUpdatePrice(p.id, editingPrice.price);
+                                if (e.key === 'Escape') setEditingPrice(null);
+                              }}
+                            />
+                            <button 
+                              onClick={() => handleUpdatePrice(p.id, editingPrice.price)}
+                              className="text-emerald-600 hover:text-emerald-700"
+                            >
+                              <Check size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div 
+                            className="flex items-center gap-2 cursor-pointer group/price"
+                            onClick={() => setEditingPrice({ id: p.id, price: p.current_price?.toString() || '0' })}
+                          >
+                            <span className="font-bold text-zinc-900">{p.current_price || 0} ₽</span>
+                            <Settings size={14} className="text-zinc-300 opacity-0 group-hover/price:opacity-100 transition-all" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-8 py-5 text-right">
+                        <button 
+                          onClick={() => findBestOffer(p)}
+                          disabled={analyzingId === p.id}
+                          className="text-xs font-bold bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-2 ml-auto"
+                        >
+                          {analyzingId === p.id ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+                          Найти лучшее предложение
+                        </button>
+                      </td>
+                    </tr>
+                    {bestOffer?.productId === p.id && (
+                      <tr className="bg-emerald-50/30">
+                        <td colSpan={5} className="px-8 py-4">
+                          <motion.div 
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center justify-between bg-white border border-emerald-100 p-4 rounded-2xl shadow-sm"
+                          >
+                            {bestOffer.offer ? (
+                              <>
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
+                                    <TrendingDown size={20} />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-bold text-zinc-900">Лучшая цена: {bestOffer.offer.price} ₽</p>
+                                    <p className="text-xs text-zinc-500">Поставщик: <span className="text-emerald-600 font-bold">{bestOffer.offer.supplier_name}</span></p>
+                                  </div>
+                                  <div className="ml-4 px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-lg">
+                                    Экономия {Math.round(((p.current_price - bestOffer.offer.price) / p.current_price) * 100)}%
+                                  </div>
+                                </div>
+                                <button className="text-xs font-bold text-emerald-600 hover:underline">Перейти к заказу</button>
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-3 text-zinc-500 italic text-sm">
+                                <AlertCircle size={18} />
+                                Предложений по рынку пока не найдено
+                              </div>
+                            )}
+                            <button onClick={() => setBestOffer(null)} className="text-zinc-400 hover:text-zinc-600">
+                              <X size={16} />
+                            </button>
+                          </motion.div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -1889,6 +2052,88 @@ const CatalogView = ({ user }: { user: User }) => {
           )}
         </>
       )}
+
+      {/* Add Product Modal */}
+      <AnimatePresence>
+        {showAddModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAddModal(false)}
+              className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-zinc-100 flex justify-between items-center">
+                <h3 className="text-xl font-bold text-zinc-900">Добавить товар в каталог</h3>
+                <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-600">
+                  <X size={24} />
+                </button>
+              </div>
+              <form onSubmit={handleAddProduct} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Название товара</label>
+                  <input 
+                    type="text"
+                    required
+                    value={newProduct.name}
+                    onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="Напр. Помидоры Черри"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Категория</label>
+                    <input 
+                      type="text"
+                      value={newProduct.category}
+                      onChange={e => setNewProduct({ ...newProduct, category: e.target.value })}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="Овощи"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Ед. измерения</label>
+                    <select 
+                      value={newProduct.unit}
+                      onChange={e => setNewProduct({ ...newProduct, unit: e.target.value })}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="кг">кг</option>
+                      <option value="шт">шт</option>
+                      <option value="л">л</option>
+                      <option value="уп">уп</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Текущая цена закупки (₽)</label>
+                  <input 
+                    type="number"
+                    value={newProduct.currentPrice}
+                    onChange={e => setNewProduct({ ...newProduct, currentPrice: e.target.value })}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="0.00"
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200"
+                >
+                  Добавить товар
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -2898,17 +3143,34 @@ const SystemSettingsView = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gemini_api_key: settings.gemini_api_key })
       });
-      const data = await res.json();
-      if (res.ok) {
-        setTestGeminiResult({ text: data.message, type: 'success' });
+      
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        const data = await res.json();
+        if (res.ok) {
+          setTestGeminiResult({ text: data.message, type: 'success' });
+        } else {
+          setTestGeminiResult({ 
+            text: data.error,
+            details: data.details,
+            type: 'error' 
+          });
+        }
       } else {
+        const text = await res.text();
         setTestGeminiResult({ 
-          text: data.error + (data.details ? ': ' + data.details : ''), 
+          text: `Ошибка сервера (${res.status})`,
+          details: text.substring(0, 500),
           type: 'error' 
         });
       }
-    } catch (err) {
-      setTestGeminiResult({ text: 'Ошибка сети при проверке API ключа', type: 'error' });
+    } catch (err: any) {
+      console.error("Test Gemini Network Error:", err);
+      setTestGeminiResult({ 
+        text: 'Ошибка сети',
+        details: 'Сервер недоступен или запрос заблокирован. Проверьте консоль браузера (F12) для деталей.',
+        type: 'error' 
+      });
     } finally {
       setIsTestingGemini(false);
     }
@@ -3160,20 +3422,37 @@ const SystemSettingsView = () => {
                     onToggle={() => toggleSecret('gemini_api_key')}
                     required={false}
                   />
-                  <div className="flex items-center gap-4">
-                    <button
-                      type="button"
-                      onClick={handleTestGemini}
-                      disabled={isTestingGemini}
-                      className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isTestingGemini ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
-                      Проверить ключ
-                    </button>
-                    {testGeminiResult && (
-                      <span className={`text-[10px] font-bold ${testGeminiResult.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {testGeminiResult.text}
-                      </span>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={handleTestGemini}
+                        disabled={isTestingGemini}
+                        className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isTestingGemini ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+                        Проверить ключ
+                      </button>
+                      {testGeminiResult && testGeminiResult.type === 'success' && (
+                        <span className="text-[10px] font-bold text-emerald-600">
+                          {testGeminiResult.text}
+                        </span>
+                      )}
+                    </div>
+                    {testGeminiResult && testGeminiResult.type === 'error' && (
+                      <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-1">
+                        <div className="flex items-center gap-1.5 text-red-600">
+                          <AlertCircle size={14} />
+                          <span className="text-xs font-bold">{testGeminiResult.text}</span>
+                        </div>
+                        {/* @ts-ignore */}
+                        {testGeminiResult.details && (
+                          <p className="text-[10px] text-red-500 leading-relaxed">
+                            {/* @ts-ignore */}
+                            {testGeminiResult.details}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
