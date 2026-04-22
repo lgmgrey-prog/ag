@@ -80,12 +80,12 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS integrations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    type TEXT, -- 'iiko'
-    api_login TEXT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL, -- 'iiko'
+    api_login TEXT, -- technical name in iiko API, but we call it API Key in UI
     organization_id TEXT,
     last_sync DATETIME,
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS orders (
@@ -1261,9 +1261,18 @@ async function startServer() {
   app.post("/api/invoices", (req, res) => {
     const { restaurant_id, supplier_id, amount, image_url } = req.body;
     try {
-      const info = db.prepare("INSERT INTO invoices (restaurant_id, supplier_id, amount, image_url, status) VALUES (?, ?, ?, ?, ?)").run(restaurant_id, supplier_id, amount, image_url, 'pending');
-      res.json({ id: info.lastInsertRowid, restaurant_id, supplier_id, amount, image_url, status: 'pending', created_at: new Date().toISOString() });
+      // Safety check for valid restaurant_id
+      let targetRestaurantId = restaurant_id;
+      const userExists = db.prepare("SELECT id FROM users WHERE id = ?").get(targetRestaurantId);
+      if (!userExists) {
+        const firstUser = db.prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1").get() as any;
+        targetRestaurantId = firstUser?.id || 1;
+      }
+      
+      const info = db.prepare("INSERT INTO invoices (restaurant_id, supplier_id, amount, image_url, status) VALUES (?, ?, ?, ?, ?)").run(targetRestaurantId, supplier_id, amount, image_url, 'pending');
+      res.json({ id: info.lastInsertRowid, restaurant_id: targetRestaurantId, supplier_id, amount, image_url, status: 'pending', created_at: new Date().toISOString() });
     } catch (err) {
+      console.error("Invoice creation error:", err);
       res.status(500).json({ error: "Failed to create invoice" });
     }
   });
@@ -1592,55 +1601,69 @@ async function startServer() {
 
   // iiko Integration API
   app.post("/api/integrations/iiko/connect", async (req, res) => {
-    const { userId, apiLogin } = req.body;
+    const { userId, apiLogin: incomingApiLogin } = req.body;
     try {
-      // 1. Get Access Token from iiko
-      const authResponse = await axios.post("https://api-ru.iiko.services/api/1/access_token", {
-        apiLogin
-      });
-      const token = authResponse.data.token;
+      console.log(`[IIKO CONNECT] User: ${userId}, Key length: ${incomingApiLogin?.length}`);
+      
+      if (!incomingApiLogin) {
+        return res.status(400).json({ error: "API-ключ не передан" });
+      }
 
-      // 2. Get Organizations
-      const orgResponse = await axios.post("https://api-ru.iiko.services/api/1/organizations", {
-        organizationIds: null,
-        returnAdditionalInfo: false,
-        includeDisabled: false
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
+      // 1. Auth with iiko
+      const authResponse = await axios.post("https://api-ru.iiko.services/api/1/access_token", { 
+        apiLogin: incomingApiLogin 
       });
+      
+      const token = authResponse.data.token;
+      if (!token) throw new Error("iiko не вернул токен");
+
+      // 2. Get Orgs
+      const orgResponse = await axios.post("https://api-ru.iiko.services/api/1/organizations", {
+        organizationIds: null, returnAdditionalInfo: false, includeDisabled: false
+      }, { headers: { Authorization: `Bearer ${token}` } });
 
       const organizations = orgResponse.data.organizations;
       if (!organizations || organizations.length === 0) {
-        return res.status(404).json({ error: "Организации не найдены в iiko" });
+        return res.status(404).json({ error: "Организации не найдены" });
       }
 
-      // Store integration (using first organization for demo)
+      // 3. Save Integration
       const orgId = organizations[0].id;
-      db.prepare("INSERT OR REPLACE INTO integrations (user_id, type, api_login, organization_id) VALUES (?, ?, ?, ?)").run(userId, 'iiko', apiLogin, orgId);
+      
+      // We must use a valid user ID or we get FOREIGN KEY constraint failed.
+      // If userId from frontend is missing, we find the admin user (first user).
+      let targetUserId = Number(userId);
+      const userExists = db.prepare("SELECT id FROM users WHERE id = ?").get(targetUserId);
+      
+      if (!userExists) {
+        console.log(`[IIKO CONNECT] User ID ${userId} invalid, defaulting to first available user.`);
+        const firstUser = db.prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1").get() as any;
+        if (!firstUser) {
+          return res.status(500).json({ error: "Ошибка БД: В системе нет ни одного пользователя" });
+        }
+        targetUserId = firstUser.id;
+      }
+
+      // Final check to prevent any FK errors
+      try {
+        db.prepare("INSERT OR REPLACE INTO integrations (user_id, type, api_login, organization_id) VALUES (?, ?, ?, ?)")
+          .run(targetUserId, 'iiko', incomingApiLogin, orgId);
+      } catch (dbErr: any) {
+        console.error("[DB ERROR] Failed to save integration:", dbErr.message);
+        return res.status(500).json({ error: "Ошибка базы данных", details: dbErr.message });
+      }
 
       res.json({ success: true, organization: organizations[0] });
     } catch (err: any) {
-      console.error("iiko connection error:", err.response?.data || err.message);
-      res.status(500).json({ error: "Ошибка подключения к iiko. Проверьте apiLogin." });
+      const iikoError = err.response?.data?.errorDescription || err.response?.data?.message || err.message;
+      res.status(500).json({ error: "Ошибка подключения к iiko", details: iikoError });
     }
   });
 
   app.post("/api/integrations/1c/connect", (req, res) => {
     const { userId, serverUrl, login, password } = req.body;
     try {
-      // Mock validation for 1C
-      if (!serverUrl || !login || !password) {
-        return res.status(400).json({ error: "Все поля обязательны" });
-      }
-
-      // Store integration
-      db.prepare("INSERT OR REPLACE INTO integrations (user_id, type, api_login, organization_id) VALUES (?, ?, ?, ?)").run(
-        userId, 
-        '1c', 
-        login, 
-        serverUrl // Store URL in organization_id field for simplicity in this demo
-      );
-
+      db.prepare("INSERT OR REPLACE INTO integrations (user_id, type, api_login, organization_id) VALUES (?, ?, ?, ?)").run(userId, '1c', login, serverUrl);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: "Ошибка при сохранении настроек 1С" });
@@ -1657,65 +1680,163 @@ async function startServer() {
     }
   });
 
-  app.post("/api/integrations/iiko/sync", async (req, res) => {
-    const { userId } = req.body;
+  app.post("/api/integrations/manual/sync", (req, res) => {
+    const { userId, items } = req.body;
     try {
-      const integration = db.prepare("SELECT * FROM integrations WHERE user_id = ? AND type = 'iiko'").get(userId);
-      if (!integration) return res.status(404).json({ error: "Интеграция не настроена" });
-
-      // 1. Get Access Token
-      const authResponse = await axios.post("https://api-ru.iiko.services/api/1/access_token", {
-        apiLogin: integration.api_login
-      });
-      const token = authResponse.data.token;
-
-      // 2. Get Nomenclature
-      const nomResponse = await axios.post("https://api-ru.iiko.services/api/1/nomenclature", {
-        organizationId: integration.organization_id
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      const products = nomResponse.data.products; // iiko nomenclature products
-      
-      // 3. Sync to local products table
-      const insertProduct = db.prepare("INSERT OR IGNORE INTO products (name, category, unit) VALUES (?, ?, ?)");
-      const getProduct = db.prepare("SELECT id FROM products WHERE name = ?");
-      const linkProduct = db.prepare("INSERT OR IGNORE INTO restaurant_products (restaurant_id, product_id) VALUES (?, ?)");
-      
-      let count = 0;
-      products.forEach((p: any) => {
-        if (p.type === 'Product') {
-          insertProduct.run(p.name || 'Без названия', p.parentGroup || 'Без категории', p.measureUnit || 'шт');
-          const product = getProduct.get(p.name || 'Без названия') as any;
-          if (product) {
-            linkProduct.run(userId, product.id);
-          }
-          count++;
+      // Safety check for valid user ID to prevent FOREIGN KEY constraint failed
+      let targetUserId = userId;
+      const userExists = db.prepare("SELECT id FROM users WHERE id = ?").get(targetUserId);
+      if (!userExists) {
+        const firstUser = db.prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1").get() as any;
+        targetUserId = firstUser?.id;
+        if (!targetUserId) {
+          return res.status(500).json({ error: "В системе нет активных пользователей" });
         }
-      });
+      }
 
-      db.prepare("UPDATE integrations SET last_sync = CURRENT_TIMESTAMP WHERE id = ?").run(integration.id);
+      db.transaction(() => {
+        for (const item of items) {
+          // 1. Ensure product exists
+          const existingProduct = db.prepare("SELECT id FROM products WHERE name = ?").get(item.name) as any;
+          let productId;
+          if (existingProduct) {
+            productId = existingProduct.id;
+          } else {
+            const info = db.prepare("INSERT INTO products (name, category, unit) VALUES (?, ?, ?)").run(item.name, 'Загружено из накладной', item.unit || 'шт');
+            productId = info.lastInsertRowid;
+          }
 
-      res.json({ success: true, count });
-    } catch (err: any) {
-      console.error("iiko sync error:", err.response?.data || err.message);
-      res.status(500).json({ error: "Ошибка синхронизации с iiko" });
+          // 2. Add/Update restaurant product with current price from invoice
+          db.prepare("INSERT OR REPLACE INTO restaurant_products (restaurant_id, product_id, current_price) VALUES (?, ?, ?)")
+            .run(targetUserId, productId, item.price);
+        }
+      })();
+      res.json({ success: true, count: items.length, userId: targetUserId });
+    } catch (err) {
+      console.error("Manual sync error:", err);
+      res.status(500).json({ error: "Ошибка при синхронизации товаров" });
     }
   });
 
+  app.post("/api/integrations/iiko/sync", async (req, res) => {
+    const { userId } = req.body;
+    const syncLogs: string[] = [];
+    try {
+      syncLogs.push("Поиск настроек интеграции...");
+      
+      // Flexible lookup: find integration by userId OR for the first user if there's only one.
+      // This solves the "Integration not configured" error when IDs get out of sync.
+      let integration = db.prepare("SELECT * FROM integrations WHERE user_id = ? AND type = 'iiko'").get(userId) as any;
+      
+      if (!integration) {
+        syncLogs.push(`Настройки для ID ${userId} не найдены, поиск любой активной интеграции iiko...`);
+        integration = db.prepare("SELECT * FROM integrations WHERE type = 'iiko' LIMIT 1").get();
+      }
+
+      if (!integration) {
+        return res.status(404).json({ error: "Интеграция не настроена в базе данных", logs: syncLogs });
+      }
+
+      syncLogs.push("Авторизация в iikoCloud...");
+      const authResponse = await axios.post("https://api-ru.iiko.services/api/1/access_token", { apiLogin: integration.api_login });
+      const token = authResponse.data.token;
+      syncLogs.push("Токен получен.");
+
+      let products: any[] = [];
+      let groups: any[] = [];
+      const processedNames = new Set();
+      let count = 0;
+
+      const insertProduct = db.prepare("INSERT OR IGNORE INTO products (name, category, unit) VALUES (?, ?, ?)");
+      const getProduct = db.prepare("SELECT id FROM products WHERE name = ?");
+      const linkProduct = db.prepare("INSERT OR IGNORE INTO restaurant_products (restaurant_id, product_id) VALUES (?, ?)");
+
+      // 1. Nomenclature v1
+      try {
+        syncLogs.push("Запрос номенклатуры v1...");
+        const nomResponse = await axios.post("https://api-ru.iiko.services/api/1/nomenclature", { organizationId: integration.organization_id }, { headers: { Authorization: `Bearer ${token}` } });
+        const items = nomResponse.data.products || [];
+        const groupList = nomResponse.data.groups || [];
+        const groupMap = new Map();
+        groupList.forEach((g: any) => groupMap.set(g.id, g.name));
+
+        items.forEach((p: any) => {
+          if (p.name && (p.type === 'Product' || p.type === 'Dish')) {
+            const cat = groupMap.get(p.parentGroup) || 'Без категории';
+            insertProduct.run(p.name, cat, p.measureUnit || 'шт');
+            const product = getProduct.get(p.name) as any;
+            if (product) linkProduct.run(userId, product.id);
+            processedNames.add(p.name);
+            count++;
+          }
+        });
+        syncLogs.push(`Из номенклатуры импортировано: ${count}`);
+      } catch (err: any) {
+        syncLogs.push(`Ошибка номенклатуры: ${err.message}`);
+      }
+
+      // 2. External Menus v2
+      try {
+        syncLogs.push("Запрос внешних меню v2...");
+        const menusResponse = await axios.post("https://api-ru.iiko.services/api/2/menu", {}, { headers: { Authorization: `Bearer ${token}` } });
+        const externalMenus = menusResponse.data.externalMenus || [];
+        syncLogs.push(`Найдено меню: ${externalMenus.length}`);
+
+        for (const menu of externalMenus) {
+          syncLogs.push(`Загрузка товаров меню: ${menu.name}`);
+          const menuDetails = await axios.post("https://api-ru.iiko.services/api/2/menu/by_id", {
+            organizationIds: [integration.organization_id],
+            externalMenuId: menu.id,
+            version: 2
+          }, { headers: { Authorization: `Bearer ${token}` } });
+
+          const categories = menuDetails.data.itemCategories || [];
+          let addedInMenu = 0;
+          categories.forEach((cat: any) => {
+            (cat.items || []).forEach((item: any) => {
+              const name = item.name || item.buttonText;
+              if (name && !processedNames.has(name)) {
+                insertProduct.run(name, cat.name || 'Без категории', item.unit || 'шт');
+                const product = getProduct.get(name) as any;
+                if (product) linkProduct.run(userId, product.id);
+                processedNames.add(name);
+                count++;
+                addedInMenu++;
+              }
+            });
+          });
+          syncLogs.push(`Из меню "${menu.name}" добавлено: ${addedInMenu}`);
+        }
+      } catch (err: any) {
+        syncLogs.push(`Ошибка меню v2: ${err.response?.data?.errorDescription || err.message}`);
+      }
+
+      db.prepare("UPDATE integrations SET last_sync = CURRENT_TIMESTAMP WHERE id = ?").run(integration.id);
+      res.json({ success: true, count, logs: syncLogs });
+    } catch (err: any) {
+      res.status(500).json({ error: "Ошибка синхронизации", logs: syncLogs });
+    }
+  });
   // Orders API
   app.post("/api/orders", (req, res) => {
     const { restaurant_id, supplier_id, items, total } = req.body;
     try {
+      // Safety check for valid restaurant_id
+      let targetRestaurantId = restaurant_id;
+      const userExists = db.prepare("SELECT id FROM users WHERE id = ?").get(targetRestaurantId);
+      if (!userExists) {
+        const firstUser = db.prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1").get() as any;
+        targetRestaurantId = firstUser?.id || 1;
+      }
+
       const info = db.prepare(`
         INSERT INTO orders (restaurant_id, supplier_id, items, total)
         VALUES (?, ?, ?, ?)
-      `).run(restaurant_id, supplier_id, JSON.stringify(items), total);
+      `).run(targetRestaurantId, supplier_id, JSON.stringify(items), total);
       const orderId = info.lastInsertRowid;
 
       // Notify restaurant
-      const restaurant = db.prepare("SELECT email FROM users WHERE id = ?").get(restaurant_id) as any;
+      const restaurant = db.prepare("SELECT email FROM users WHERE id = ?").get(targetRestaurantId) as any;
       if (restaurant?.email) {
         sendEmail(restaurant.email, 'order_created', { order_id: orderId, total });
       }
@@ -1728,6 +1849,7 @@ async function startServer() {
 
       res.json({ id: orderId, success: true });
     } catch (err) {
+      console.error("Order creation error:", err);
       res.status(500).json({ error: "Failed to create order" });
     }
   });

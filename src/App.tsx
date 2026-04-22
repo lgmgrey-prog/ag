@@ -976,11 +976,12 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onClose }: { isOpen: 
   );
 };
 
-const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boolean, onClose: () => void, onUpload: () => void, userId: number }) => {
-  const [amount, setAmount] = useState('');
+const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boolean, onClose: () => void, onUpload: (newUserId?: number) => void, userId: number }) => {
+  const [amount, setAmount] = useState('0');
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [isRecognizing, setIsRecognizing] = useState(false);
+  const [recognizedItems, setRecognizedItems] = useState<any[]>([]);
 
   const handleAIRecognize = async () => {
     if (!file) return;
@@ -990,8 +991,14 @@ const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boo
       const base64 = reader.result as string;
       try {
         const result = await recognizeInvoice(base64);
-        if (result && result.amount) {
-          setAmount(result.amount.toString());
+        if (result) {
+          if (result.amount) {
+            setAmount(result.amount.toString());
+          } else if (result.items && result.items.length > 0) {
+            const total = result.items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
+            setAmount(total.toString());
+          }
+          if (result.items) setRecognizedItems(result.items);
         }
       } catch (err) {
         console.error(err);
@@ -1004,27 +1011,48 @@ const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !file) return;
+    if (!file) return;
     setLoading(true);
 
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = reader.result as string;
       try {
-        const res = await fetch('/api/invoices', {
+        // 1. Save standard invoice record
+        await fetch('/api/invoices', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             restaurant_id: userId,
             supplier_id: 1,
-            amount: parseFloat(amount),
+            amount: parseFloat(amount) || 0,
             image_url: base64
           })
         });
-        if (res.ok) {
-          onUpload();
-          onClose();
+
+        // 2. Sync items to restaurant product list if we have any
+        let finalUserId = userId;
+        if (recognizedItems.length > 0) {
+          const syncRes = await fetch('/api/integrations/manual/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              items: recognizedItems.map(item => ({
+                name: item.name,
+                price: item.price,
+                unit: item.unit
+              }))
+            })
+          });
+          const syncData = await syncRes.json();
+          if (syncData.userId && syncData.userId !== userId) {
+            finalUserId = syncData.userId;
+          }
         }
+
+        onUpload(finalUserId);
+        onClose();
       } catch (err) {
         console.error(err);
       } finally {
@@ -1042,28 +1070,18 @@ const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boo
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+        className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
       >
-        <div className="p-6 border-b border-zinc-100 flex justify-between items-center">
-          <h3 className="text-xl font-bold text-zinc-900">Загрузка накладной</h3>
+        <div className="p-6 border-b border-zinc-100 flex justify-between items-center bg-white sticky top-0 z-10">
+          <h3 className="text-xl font-bold text-zinc-900">Загрузка своей накладной</h3>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
             <X size={24} />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          <div>
-            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Сумма в накладной (₽)</label>
-            <input 
-              type="number" 
-              required
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Файл (JPG, PNG, PDF)</label>
+        
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto">
+          <div className="space-y-4">
+            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Файл накладной</label>
             <div className="relative">
               <input 
                 type="file" 
@@ -1075,33 +1093,65 @@ const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boo
               />
               <label 
                 htmlFor="invoice-file"
-                className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-zinc-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer transition-all"
+                className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-zinc-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer transition-all min-h-[160px]"
               >
                 <Upload size={32} className={file ? 'text-emerald-500' : 'text-zinc-300'} />
-                <p className="mt-2 text-sm font-medium text-zinc-500">
+                <p className="mt-2 text-sm font-medium text-zinc-500 text-center">
                   {file ? file.name : 'Нажмите для выбора файла'}
                 </p>
               </label>
             </div>
+            
             {file && (
               <button
                 type="button"
                 onClick={handleAIRecognize}
                 disabled={isRecognizing}
-                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
               >
-                {isRecognizing ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
-                {isRecognizing ? 'Распознавание...' : 'Распознать сумму через AI'}
+                {isRecognizing ? <RefreshCw size={16} className="animate-spin" /> : <Zap size={16} />}
+                {isRecognizing ? 'Распознаём позиции...' : 'Распознать позиции через AI'}
               </button>
             )}
           </div>
-          <button 
-            type="submit"
-            disabled={loading || !amount || !file}
-            className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
-          >
-            {loading ? 'Загрузка...' : 'Загрузить'}
-          </button>
+
+          {recognizedItems.length > 0 && (
+            <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Распознанные позиции ({recognizedItems.length})</h4>
+                <div className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded uppercase tracking-widest">AI Check</div>
+              </div>
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {recognizedItems.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-white border border-zinc-100 rounded-xl">
+                    <div className="flex-1 min-w-0 pr-4">
+                      <p className="text-sm font-bold text-zinc-900 truncate">{item.name}</p>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-medium">
+                        {item.quantity} {item.unit || 'шт'} × {item.price} ₽
+                      </p>
+                    </div>
+                    <p className="text-sm font-bold text-zinc-900 shrink-0">{item.total} ₽</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t border-zinc-200 flex justify-between items-center">
+                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Итоговая сумма:</span>
+                <span className="text-lg font-black text-zinc-900">{amount} ₽</span>
+              </div>
+              <p className="mt-4 text-[10px] text-zinc-400">Эти позиции будут автоматически добавлены в ваш каталог для анализа цен.</p>
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-zinc-100">
+            <button 
+              type="submit"
+              disabled={loading || !file}
+              className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? <RefreshCw size={20} className="animate-spin" /> : <Save size={20} />}
+              {loading ? 'Загрузка...' : 'Загрузить в мой каталог'}
+            </button>
+          </div>
         </form>
       </motion.div>
     </div>
@@ -1589,7 +1639,7 @@ const InvoicesView = ({ user }: { user: User }) => {
 
 const IntegrationsView = ({ user, onSyncSuccess }: { user: User, onSyncSuccess?: () => void }) => {
   const [integration, setIntegration] = useState<any>(null);
-  const [apiLogin, setApiLogin] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -1609,14 +1659,15 @@ const IntegrationsView = ({ user, onSyncSuccess }: { user: User, onSyncSuccess?:
       const res = await fetch('/api/integrations/iiko/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, apiLogin })
+        body: JSON.stringify({ userId: user.id, apiLogin: apiKey })
       });
       const data = await res.json();
       if (data.success) {
-        setIntegration({ type: 'iiko', api_login: apiLogin, organization_id: data.organization.id });
+        setIntegration({ type: 'iiko', api_login: apiKey, organization_id: data.organization.id });
         setMessage({ type: 'success', text: `Успешно подключено к iiko: ${data.organization.name}` });
       } else {
-        setMessage({ type: 'error', text: data.error });
+        const errorText = data.details ? `${data.error}: ${data.details}` : data.error;
+        setMessage({ type: 'error', text: errorText });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Ошибка подключения' });
@@ -1643,7 +1694,8 @@ const IntegrationsView = ({ user, onSyncSuccess }: { user: User, onSyncSuccess?:
           .then(res => res.json())
           .then(setIntegration);
       } else {
-        setMessage({ type: 'error', text: data.error });
+        const logContent = data.logs ? `\n\nПротокол работы:\n${data.logs.join('\n')}` : '';
+        setMessage({ type: 'error', text: data.error + logContent });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Ошибка синхронизации' });
@@ -1694,10 +1746,10 @@ const IntegrationsView = ({ user, onSyncSuccess }: { user: User, onSyncSuccess?:
           {!integration ? (
             <form onSubmit={handleConnect} className="space-y-4">
               <PasswordInput 
-                label="API Login (из iiko.services)"
-                value={apiLogin}
-                onChange={setApiLogin}
-                placeholder="Введите ваш API Login"
+                label="API Ключ (из iiko.services)"
+                value={apiKey}
+                onChange={setApiKey}
+                placeholder="Введите ваш API Ключ"
                 show={showPassword}
                 onToggle={() => setShowPassword(!showPassword)}
               />
@@ -1709,7 +1761,7 @@ const IntegrationsView = ({ user, onSyncSuccess }: { user: User, onSyncSuccess?:
                 {loading ? 'Подключение...' : 'Подключить iiko'}
               </button>
               <p className="text-xs text-zinc-400 text-center">
-                Для получения API Login перейдите в личный кабинет iiko.services раздел "Настройки" -&gt; "API"
+                Для получения API Ключа перейдите в личный кабинет iiko.services раздел "Настройки" -&gt; "API"
               </p>
             </form>
           ) : (
@@ -1904,7 +1956,7 @@ const CatalogView = ({ user }: { user: User }) => {
           <Package size={64} className="mx-auto text-zinc-100 mb-6" />
           <p className="text-zinc-400 font-medium">Товары не найдены</p>
           <p className="text-sm text-zinc-300 mt-2">
-            {searchTerm ? 'Попробуйте изменить поисковый запрос' : 'Сначала синхронизируйте данные в разделе "Интеграции"'}
+            {searchTerm ? 'Попробуйте изменить поисковый запрос' : 'Загрузите накладную в разделе "Обзор" или синхронизируйте данные в разделе "Интеграции"'}
           </p>
         </div>
       ) : (
@@ -2611,12 +2663,13 @@ const Pagination = ({
   );
 };
 
-const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPayment }: { 
+const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPayment, onUpdateUser }: { 
   user: User, 
   requestedTab?: string | null, 
   onTabHandled?: () => void,
   showToast?: (m: string, t?: 'success' | 'error') => void,
-  onPayment: (plan: 'monthly' | 'yearly') => void
+  onPayment: (plan: 'monthly' | 'yearly') => void,
+  onUpdateUser?: (u: User) => void
 }) => {
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -2629,6 +2682,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const pageSize = 20;
 
   const tabs = [
@@ -2649,15 +2703,46 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
     }
   }, [requestedTab, onTabHandled]);
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     fetch('/api/prices')
-      .then(res => {
-        if (!res.ok) throw new Error('Network response was not ok');
-        return res.json();
-      })
-      .then(setPrices)
-      .catch(err => console.error('Error fetching prices:', err));
+      .then(res => res.json())
+      .then(setPrices);
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleAnalyze = async () => {
+    setLoading(true);
+    try {
+      // Fetch user's actual items from their digital catalog with a high limit for analysis
+      const res = await fetch(`/api/products?restaurantId=${user.id}&limit=1000`);
+      const userProducts = await res.json();
+      
+      const matrix = userProducts.products?.map((p: any) => ({
+        name: p.name,
+        currentPrice: p.current_price
+      })) || [];
+
+      if (matrix.length === 0) {
+        showToast?.('Ваш каталог пуст. Загрузите накладные или синхронизируйте iiko, чтобы появились позиции для анализа.', 'error');
+        setLoading(false);
+        return;
+      }
+
+      const result = await analyzePrices(matrix, prices);
+      setRecommendations(result.recommendations || []);
+      if ((result.recommendations || []).length === 0) {
+        showToast?.('Анализ завершен. На данный момент у вас оптимальные цены.');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast?.('Ошибка при анализе цен', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredPrices = prices.filter(p => 
     p.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -2731,22 +2816,6 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
     } catch (err) {
       console.error(err);
       showToast?.('Ошибка при оформлении заказа', 'error');
-    }
-  };
-
-  const handleAnalyze = async () => {
-    setLoading(true);
-    const matrix = [
-      { name: "Помидоры", currentPrice: 160 },
-      { name: "Говядина вырезка", currentPrice: 950 }
-    ];
-    try {
-      const result = await analyzePrices(matrix, prices);
-      setRecommendations(result.recommendations || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -2876,10 +2945,10 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               <div className="lg:col-span-2 flex flex-col sm:flex-row gap-3">
                 <button 
-                  onClick={() => setActiveTab('integrations')}
+                  onClick={() => setIsUploadModalOpen(true)}
                   className="flex-1 bg-white border border-zinc-200 text-zinc-900 px-4 sm:px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-zinc-50 transition-all shadow-sm text-sm sm:text-base active:scale-[0.98]"
                 >
-                  <FileText size={20} className="text-emerald-600 shrink-0" /> <span className="truncate">Выгрузить из iiko</span>
+                  <Upload size={20} className="text-emerald-600 shrink-0" /> <span className="truncate">Загрузить накладную</span>
                 </button>
                 <button 
                   onClick={handleAnalyze}
@@ -2932,7 +3001,13 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                           <p className="text-xs text-zinc-400 line-through mb-1">{rec.currentPrice} ₽</p>
                           <p className="text-2xl font-bold text-emerald-600">{rec.bestPrice} ₽</p>
                         </div>
-                        <button className="bg-zinc-100 text-zinc-900 p-2 rounded-xl hover:bg-emerald-600 hover:text-white transition-all">
+                        <button 
+                          onClick={() => {
+                            setSearchQuery(rec.product);
+                            document.getElementById('market-prices-section')?.scrollIntoView({ behavior: 'smooth' });
+                          }}
+                          className="bg-zinc-100 text-zinc-900 p-2 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"
+                        >
                           <ArrowRight size={20} />
                         </button>
                       </div>
@@ -2943,7 +3018,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             )}
 
             {/* Price Table */}
-            <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+            <div id="market-prices-section" className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
               <div className="p-6 border-b border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 className="text-xl font-bold text-zinc-900">Актуальные прайсы рынка</h2>
                 <div className="relative w-full sm:w-80">
@@ -3165,6 +3240,19 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
       />
     )}
   </AnimatePresence>
+
+  <UploadInvoiceModal 
+    isOpen={isUploadModalOpen} 
+    onClose={() => setIsUploadModalOpen(false)} 
+    onUpload={(newUserId) => {
+      if (newUserId && newUserId !== user.id) {
+        onUpdateUser?.({ ...user, id: newUserId });
+      }
+      fetchData();
+      showToast?.('Накладная успешно загружена и проанализирована');
+    }}
+    userId={user.id}
+  />
 </div>
 );
 };
@@ -5745,7 +5833,7 @@ export default function App() {
       <main>
         {user ? (
           user.type === 'restaurant' ? (
-            <RestaurantDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} onPayment={handlePayment} />
+            <RestaurantDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} onPayment={handlePayment} onUpdateUser={handleUpdateUser} />
           ) : user.type === 'admin' ? (
             <AdminDashboard user={user} />
           ) : (
