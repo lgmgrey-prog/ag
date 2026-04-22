@@ -405,19 +405,11 @@ async function startServer() {
   const app = express();
   app.set('trust proxy', 1);
   
-  // Prevent browser caching of redirects and handle accidental localhost redirects
+  // Prevent browser caching of redirects
   app.use((req, res, next) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
-    // If somehow a request with host 'localhost' hits the server (unlikely in this env, but for safety)
-    if (req.headers.host && req.headers.host.includes('localhost:3000')) {
-      const settings = getSystemSettings();
-      if (settings.base_url && !settings.base_url.includes('localhost')) {
-        return res.redirect(302, settings.base_url + req.url);
-      }
-    }
     next();
   });
 

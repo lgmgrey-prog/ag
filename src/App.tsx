@@ -43,7 +43,9 @@ import {
   Download,
   Eye,
   EyeOff,
-  MapPin
+  MapPin,
+  Tag,
+  Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -141,16 +143,16 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
             <a href="#" className="hover:text-emerald-600 transition-colors">Поставщики</a>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {user ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <div className="relative">
                   <button 
                     onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                    className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition-colors relative"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition-colors relative"
                   >
-                    <Bell size={20} className="text-zinc-600" />
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                    <Bell size={18} className="text-zinc-600 sm:w-5 sm:h-5" />
+                    <span className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                   </button>
                   
                   <AnimatePresence>
@@ -200,33 +202,33 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
                   </AnimatePresence>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="hidden sm:block text-right">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="hidden lg:block text-right">
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest leading-none mb-1">Добро пожаловать</p>
                     <p className="text-sm font-bold text-zinc-900 leading-none">{user.name}</p>
                   </div>
                   
-                  <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
+                  <div className="flex items-center gap-1 sm:gap-2 bg-zinc-100 p-1 rounded-xl">
                     <button 
                       onClick={onOpenFeedback}
-                      className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-white rounded-lg transition-all"
+                      className="p-1.5 sm:p-2 text-zinc-500 hover:text-emerald-600 hover:bg-white rounded-lg transition-all"
                       title="Поддержка"
                     >
-                      <HelpCircle size={20} />
+                      <HelpCircle size={18} className="sm:w-5 sm:h-5" />
                     </button>
                     <button 
                       onClick={onOpenSettings}
-                      className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all"
+                      className="p-1.5 sm:p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all"
                       title="Настройки"
                     >
-                      <Settings size={20} />
+                      <Settings size={18} className="sm:w-5 sm:h-5" />
                     </button>
                     <button 
                       onClick={onLogout}
-                      className="p-2 text-zinc-500 hover:text-red-600 hover:bg-white rounded-lg transition-all"
+                      className="p-1.5 sm:p-2 text-zinc-500 hover:text-red-600 hover:bg-white rounded-lg transition-all"
                       title="Выйти"
                     >
-                      <LogOut size={20} />
+                      <LogOut size={18} className="sm:w-5 sm:h-5" />
                     </button>
                   </div>
                 </div>
@@ -280,25 +282,25 @@ const SettingsView = ({ user, onUpdate, showToast }: { user: User, onUpdate: (u:
 
   return (
     <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-      <div className="p-8 border-b border-zinc-100 bg-zinc-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="p-6 sm:p-8 border-b border-zinc-100 bg-zinc-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-zinc-900 tracking-tight">Настройки профиля</h2>
-          <p className="text-zinc-500 text-sm">Укажите актуальные данные вашей организации</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight">Настройки профиля</h2>
+          <p className="text-zinc-500 text-xs sm:text-sm">Укажите актуальные данные вашей организации</p>
         </div>
         {user.type === 'restaurant' && (
-          <div className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest border ${
+          <div className={`px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest border shrink-0 ${
             user.subscription?.active 
               ? 'bg-emerald-50 border-emerald-100 text-emerald-600' 
               : 'bg-zinc-50 border-zinc-100 text-zinc-400'
           }`}>
             {user.subscription?.active 
-              ? `Подписка активна до ${new Date(user.subscription.expiresAt).toLocaleDateString()}` 
+              ? `Подписка до ${new Date(user.subscription.expiresAt).toLocaleDateString()}` 
               : 'Подписка не активна'}
           </div>
         )}
       </div>
 
-      <div className="flex border-b border-zinc-100 overflow-x-auto bg-white">
+      <div className="flex border-b border-zinc-100 overflow-x-auto bg-white no-scrollbar">
         {[
           { id: 'profile', label: 'Профиль', icon: UserIcon },
           { id: 'delivery', label: user.type === 'restaurant' ? 'Доставка' : 'Условия', icon: MapPin },
@@ -307,13 +309,13 @@ const SettingsView = ({ user, onUpdate, showToast }: { user: User, onUpdate: (u:
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-8 py-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
+            className={`flex items-center gap-2 px-6 sm:px-8 py-4 text-xs sm:text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
               activeTab === tab.id 
                 ? 'border-emerald-500 text-emerald-600 bg-emerald-50/30' 
                 : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
             }`}
           >
-            <tab.icon size={18} />
+            <tab.icon size={16} className="sm:w-[18px] sm:h-[18px]" />
             {tab.label}
           </button>
         ))}
@@ -684,29 +686,29 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
               ))}
             </ul>
           </div>
-          <div className="bg-zinc-100 rounded-3xl p-8 aspect-square flex items-center justify-center">
-             <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-zinc-200">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-bold text-zinc-900">Анализ цен: Помидоры</h3>
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Выгода 15%</span>
+          <div className="bg-zinc-100 rounded-3xl p-4 sm:p-8 aspect-auto sm:aspect-square flex items-center justify-center min-h-[400px]">
+          <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 w-full max-w-md border border-zinc-200">
+            <div className="flex items-center justify-between gap-2 mb-6">
+              <h3 className="font-bold text-zinc-900 text-sm sm:text-base">Анализ цен: Помидоры</h3>
+              <span className="text-[10px] sm:text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded whitespace-nowrap">Выгода 15%</span>
+            </div>
+            <div className="space-y-4">
+              <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 border border-emerald-100 flex justify-between items-center gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-0.5">Лучшая цена</p>
+                  <p className="font-bold text-zinc-900 text-sm sm:text-base truncate">Овощи-Фрукты Опт</p>
                 </div>
-                <div className="space-y-4">
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 flex justify-between items-center">
-                    <div>
-                      <p className="text-xs text-emerald-600 font-bold uppercase">Лучшая цена</p>
-                      <p className="font-bold text-zinc-900">Овощи-Фрукты Опт</p>
-                    </div>
-                    <p className="text-lg font-bold text-emerald-600">145 ₽/кг</p>
-                  </div>
-                  <div className="p-3 rounded-xl border border-zinc-100 flex justify-between items-center opacity-60">
-                    <div>
-                      <p className="text-xs text-zinc-400 font-bold uppercase">Ваш текущий</p>
-                      <p className="font-bold text-zinc-900">Мясной Двор</p>
-                    </div>
-                    <p className="text-lg font-bold text-zinc-900">160 ₽/кг</p>
-                  </div>
+                <p className="text-base sm:text-lg font-bold text-emerald-600 whitespace-nowrap">145 ₽/кг</p>
+              </div>
+              <div className="p-3 sm:p-4 rounded-xl border border-zinc-100 flex justify-between items-center gap-2 opacity-60">
+                <div className="min-w-0">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-0.5">Ваш текущий</p>
+                  <p className="font-bold text-zinc-900 text-sm sm:text-base truncate">Мясной Двор</p>
                 </div>
-             </div>
+                <p className="text-base sm:text-lg font-bold text-zinc-900 whitespace-nowrap">160 ₽/кг</p>
+              </div>
+            </div>
+          </div>
           </div>
         </div>
       </div>
@@ -1364,16 +1366,16 @@ const ChatWindow = ({ user, targetContactId }: { user: User, targetContactId?: n
   };
 
   return (
-    <div className="bg-white border border-zinc-200 rounded-3xl h-[600px] flex overflow-hidden shadow-sm">
+    <div className="bg-white border border-zinc-200 rounded-3xl h-[600px] flex overflow-hidden shadow-sm relative">
       {/* Sidebar */}
-      <div className="w-80 border-r border-zinc-100 flex flex-col bg-zinc-50/50">
+      <div className={`${selectedConv ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-zinc-100 flex-col bg-zinc-50/50`}>
         <div className="p-6 border-b border-zinc-100 bg-white">
           <h3 className="font-bold text-zinc-900">Сообщения</h3>
         </div>
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 && !selectedConv ? (
-            <div className="p-8 text-center">
-              <p className="text-sm text-zinc-400">Нет активных диалогов</p>
+            <div className="p-8 text-center text-zinc-400 text-sm">
+              Нет активных диалогов
             </div>
           ) : (
             <>
@@ -1405,7 +1407,7 @@ const ChatWindow = ({ user, targetContactId }: { user: User, targetContactId?: n
                   <div className="flex-1 text-left min-w-0">
                     <div className="flex justify-between items-baseline mb-1">
                       <p className="font-bold text-zinc-900 truncate">{conv.name}</p>
-                      <span className="text-[10px] text-zinc-400">
+                      <span className="text-[10px] text-zinc-400 whitespace-nowrap">
                         {conv.last_message_time ? formatMoscowTime(conv.last_message_time) : ''}
                       </span>
                     </div>
@@ -1419,17 +1421,23 @@ const ChatWindow = ({ user, targetContactId }: { user: User, targetContactId?: n
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className={`${!selectedConv ? 'hidden md:flex' : 'flex'} flex-1 flex flex-col bg-white`}>
         {selectedConv ? (
           <>
-            <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+            <div className="p-4 sm:p-6 border-b border-zinc-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-bold">
+                <button 
+                  onClick={() => setSelectedConv(null)}
+                  className="md:hidden p-2 -ml-2 text-zinc-400 hover:text-zinc-600"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-bold text-sm sm:text-base">
                   {selectedConv.name[0]}
                 </div>
                 <div>
-                  <p className="font-bold text-zinc-900">{selectedConv.name}</p>
-                  <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <p className="font-bold text-zinc-900 text-sm sm:text-base">{selectedConv.name}</p>
+                  <p className="text-[10px] sm:text-xs text-emerald-600 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-pulse"></span>
                     В сети
                   </p>
@@ -1513,9 +1521,9 @@ const InvoicesView = ({ user }: { user: User }) => {
             <Plus size={18} /> Загрузить накладную
           </button>
         </div>
-        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
           {invoices.length === 0 ? (
-            <div className="col-span-3 py-20 text-center">
+            <div className="col-span-1 sm:col-span-2 md:col-span-3 py-20 text-center">
               <FileText size={48} className="mx-auto text-zinc-200 mb-4" />
               <p className="text-zinc-400">Нет загруженных накладных</p>
             </div>
@@ -1526,16 +1534,20 @@ const InvoicesView = ({ user }: { user: User }) => {
                 onClick={() => setSelectedInvoice(inv)}
                 className="border border-zinc-100 rounded-2xl p-4 space-y-3 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all group"
               >
-                <div className="aspect-[3/4] bg-zinc-100 rounded-xl flex items-center justify-center group-hover:bg-emerald-50 transition-colors">
-                  <FileText className="text-zinc-300 group-hover:text-emerald-300 transition-colors" size={40} />
+                <div className="aspect-[3/4] bg-zinc-100 rounded-xl flex items-center justify-center group-hover:bg-emerald-50 transition-colors overflow-hidden">
+                  {inv.image_url ? (
+                    <img src={inv.image_url} alt="Invoice" className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity" referrerPolicy="no-referrer" />
+                  ) : (
+                    <FileText className="text-zinc-300 group-hover:text-emerald-300 transition-colors" size={40} />
+                  )}
                 </div>
                 <div className="flex justify-between items-center">
-                  <p className="font-bold text-zinc-900">{inv.amount} ₽</p>
+                  <p className="font-bold text-zinc-900 text-base sm:text-lg">{inv.amount.toLocaleString()} ₽</p>
                   <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${inv.status === 'pending' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
                     {inv.status === 'pending' ? 'В обработке' : 'Принято'}
                   </span>
                 </div>
-                <p className="text-xs text-zinc-400">{new Date(inv.created_at).toLocaleDateString()}</p>
+                <p className="text-[10px] sm:text-xs text-zinc-400 font-medium">{new Date(inv.created_at).toLocaleDateString()}</p>
               </div>
             ))
           )}
@@ -1645,20 +1657,20 @@ const IntegrationsView = ({ user, onSyncSuccess }: { user: User, onSyncSuccess?:
       <div className="p-6 border-b border-zinc-100">
         <h2 className="font-bold text-zinc-900">Интеграции с внешними системами</h2>
       </div>
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         <div className="max-w-2xl">
-          <div className="flex items-center gap-6 p-6 bg-zinc-50 rounded-2xl border border-zinc-100 mb-8">
-            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center border border-zinc-200 shadow-sm overflow-hidden">
-              <div className="text-orange-600 font-black text-xl tracking-tighter select-none">iiko</div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 p-4 sm:p-6 bg-zinc-50 rounded-2xl border border-zinc-100 mb-8">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-xl sm:rounded-2xl flex items-center justify-center border border-zinc-200 shadow-sm overflow-hidden shrink-0">
+              <div className="text-orange-600 font-black text-lg sm:text-xl tracking-tighter select-none">iiko</div>
             </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-zinc-900 text-lg">iiko Cloud</h3>
-              <p className="text-sm text-zinc-500">Автоматическая выгрузка номенклатуры товаров и остатков</p>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-zinc-900 text-base sm:text-lg">iiko Cloud</h3>
+              <p className="text-xs sm:text-sm text-zinc-500">Автоматическая выгрузка номенклатуры товаров и остатков</p>
             </div>
             {integration ? (
-              <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-xs font-bold rounded-full">Подключено</span>
+              <span className="w-fit px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] sm:text-xs font-bold rounded-full">Подключено</span>
             ) : (
-              <span className="px-3 py-1 bg-zinc-200 text-zinc-500 text-xs font-bold rounded-full">Не подключено</span>
+              <span className="w-fit px-3 py-1 bg-zinc-200 text-zinc-500 text-[10px] sm:text-xs font-bold rounded-full">Не подключено</span>
             )}
           </div>
 
@@ -1900,31 +1912,36 @@ const CatalogView = ({ user }: { user: User }) => {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                  <th className="px-8 py-5">Название</th>
-                  <th className="px-8 py-5">Категория</th>
-                  <th className="px-8 py-5">Ед. изм.</th>
-                  <th className="px-8 py-5">Ваша цена</th>
-                  <th className="px-8 py-5 text-right">Действия</th>
+                <tr className="bg-zinc-50 text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                  <th className="px-4 sm:px-8 py-5 min-w-[150px]">Название</th>
+                  <th className="hidden sm:table-cell px-8 py-5">Категория</th>
+                  <th className="hidden lg:table-cell px-8 py-5">Ед. изм.</th>
+                  <th className="px-4 sm:px-8 py-5 min-w-[100px]">Ваша цена</th>
+                  <th className="px-4 sm:px-8 py-5 text-right"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {products.map((p, i) => (
                   <React.Fragment key={p.id}>
                     <tr className="hover:bg-zinc-50 transition-colors group">
-                      <td className="px-8 py-5 font-bold text-zinc-900">{p.name}</td>
-                      <td className="px-8 py-5">
+                      <td className="px-4 sm:px-8 py-4 sm:py-5 font-bold text-zinc-900 text-sm sm:text-base">
+                        {p.name}
+                        <div className="sm:hidden block mt-1">
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-zinc-100 text-zinc-500 rounded uppercase tracking-tighter">{p.category}</span>
+                        </div>
+                      </td>
+                      <td className="hidden sm:table-cell px-8 py-5">
                         <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">{p.category}</span>
                       </td>
-                      <td className="px-8 py-5 text-sm text-zinc-500">{p.unit}</td>
-                      <td className="px-8 py-5">
+                      <td className="hidden lg:table-cell px-8 py-5 text-sm text-zinc-500">{p.unit}</td>
+                      <td className="px-4 sm:px-8 py-4 sm:py-5">
                         {editingPrice?.id === p.id ? (
                           <div className="flex items-center gap-2">
                             <input 
                               type="number"
                               value={editingPrice.price}
                               onChange={(e) => setEditingPrice({ ...editingPrice, price: e.target.value })}
-                              className="w-24 px-2 py-1 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-20 sm:w-24 px-2 py-1 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleUpdatePrice(p.id, editingPrice.price);
@@ -1943,54 +1960,53 @@ const CatalogView = ({ user }: { user: User }) => {
                             className="flex items-center gap-2 cursor-pointer group/price"
                             onClick={() => setEditingPrice({ id: p.id, price: p.current_price?.toString() || '0' })}
                           >
-                            <span className="font-bold text-zinc-900">{p.current_price || 0} ₽</span>
-                            <Settings size={14} className="text-zinc-300 opacity-0 group-hover/price:opacity-100 transition-all" />
+                            <span className="font-bold text-zinc-900 text-sm sm:text-base whitespace-nowrap">{p.current_price || 0} ₽</span>
+                            <Settings size={12} className="text-zinc-300 opacity-60 sm:opacity-0 sm:group-hover/price:opacity-100 transition-all" />
                           </div>
                         )}
                       </td>
-                      <td className="px-8 py-5 text-right">
+                      <td className="px-4 sm:px-8 py-4 sm:py-5 text-right">
                         <button 
                           onClick={() => findBestOffer(p)}
                           disabled={analyzingId === p.id}
-                          className="text-xs font-bold bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-2 ml-auto"
+                          className="bg-emerald-50 text-emerald-600 p-2 sm:px-3 sm:py-1.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-all ml-auto flex items-center justify-center gap-2"
                         >
                           {analyzingId === p.id ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
-                          Найти лучшее предложение
+                          <span className="hidden sm:inline text-xs font-bold whitespace-nowrap">Найти лучшее</span>
                         </button>
                       </td>
                     </tr>
                     {bestOffer?.productId === p.id && (
-                      <tr className="bg-emerald-50/30">
-                        <td colSpan={5} className="px-8 py-4">
+                      <tr className="bg-emerald-50/20">
+                        <td colSpan={5} className="px-2 sm:px-8 py-4">
                           <motion.div 
-                            initial={{ opacity: 0, y: -10 }}
+                            initial={{ opacity: 0, y: -5 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="flex items-center justify-between bg-white border border-emerald-100 p-4 rounded-2xl shadow-sm"
+                            className="flex items-center justify-between bg-white border border-emerald-100 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-sm"
                           >
                             {bestOffer.offer ? (
-                              <>
-                                <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
-                                    <TrendingDown size={20} />
+                              <div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 shrink-0">
+                                    <TrendingDown size={16} />
                                   </div>
                                   <div>
-                                    <p className="text-sm font-bold text-zinc-900">Лучшая цена: {bestOffer.offer.price} ₽</p>
-                                    <p className="text-xs text-zinc-500">Поставщик: <span className="text-emerald-600 font-bold">{bestOffer.offer.supplier_name}</span></p>
-                                  </div>
-                                  <div className="ml-4 px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-lg">
-                                    Экономия {Math.round(((p.current_price - bestOffer.offer.price) / p.current_price) * 100)}%
+                                    <p className="text-xs sm:text-sm font-bold text-zinc-900">{bestOffer.offer.price} ₽</p>
+                                    <p className="text-[10px] text-zinc-500 leading-tight">Поставщик: <span className="text-emerald-600 font-bold">{bestOffer.offer.supplier_name}</span></p>
                                   </div>
                                 </div>
-                                <button className="text-xs font-bold text-emerald-600 hover:underline">Перейти к заказу</button>
-                              </>
+                                <div className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded">
+                                  -{Math.round(((p.current_price - bestOffer.offer.price) / p.current_price) * 100)}%
+                                </div>
+                                <button className="text-[10px] sm:text-xs font-bold text-emerald-600 hover:underline">Заказать</button>
+                              </div>
                             ) : (
-                              <div className="flex items-center gap-3 text-zinc-500 italic text-sm">
-                                <AlertCircle size={18} />
-                                Предложений по рынку пока не найдено
+                              <div className="flex items-center gap-2 text-zinc-500 italic text-[11px]">
+                                <AlertCircle size={14} /> Нет предложений
                               </div>
                             )}
-                            <button onClick={() => setBestOffer(null)} className="text-zinc-400 hover:text-zinc-600">
-                              <X size={16} />
+                            <button onClick={() => setBestOffer(null)} className="text-zinc-400 hover:text-zinc-600 ml-2">
+                              <X size={14} />
                             </button>
                           </motion.div>
                         </td>
@@ -2148,10 +2164,10 @@ const CartView = ({ cart, onUpdateQuantity, onRemove, onPlaceOrder }: {
 
   return (
     <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
-      <div className="p-6 border-b border-zinc-100 flex justify-between items-center">
-        <h2 className="font-bold text-zinc-900 text-xl">Ваш заказ</h2>
-        <span className="text-sm text-zinc-500 font-medium">{cart.length} позиций</span>
-      </div>
+        <div className="p-4 sm:p-6 border-b border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h2 className="font-bold text-zinc-900 text-lg sm:text-xl">Ваш заказ</h2>
+          <span className="text-xs sm:text-sm text-zinc-500 font-medium">{cart.length} позиций</span>
+        </div>
       
       {cart.length === 0 ? (
         <div className="p-20 text-center">
@@ -2161,28 +2177,38 @@ const CartView = ({ cart, onUpdateQuantity, onRemove, onPlaceOrder }: {
         </div>
       ) : (
         <div className="flex flex-col lg:flex-row">
-          <div className="flex-1 divide-y divide-zinc-100">
+          <div className="flex-1 divide-y divide-zinc-100 order-2 lg:order-1">
             {cart.map((item, i) => (
-              <div key={i} className="p-6 flex items-center gap-6 hover:bg-zinc-50 transition-colors">
-                <div className="w-16 h-16 bg-zinc-100 rounded-2xl flex items-center justify-center text-zinc-400">
-                  <Package size={24} />
+              <div key={i} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 hover:bg-zinc-50 transition-colors">
+                <div className="flex items-center gap-4 w-full">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-zinc-100 rounded-2xl flex items-center justify-center text-zinc-400 shrink-0">
+                    <Package size={20} className="sm:hidden" />
+                    <Package size={24} className="hidden sm:block" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-zinc-900 text-sm sm:text-base truncate">{item.product_name}</p>
+                    <p className="text-xs text-zinc-500 truncate">{item.supplier_name}</p>
+                  </div>
+                  <button 
+                    onClick={() => onRemove(item.product_name, item.supplier_name)}
+                    className="sm:hidden text-zinc-300 hover:text-red-500 transition-colors p-2"
+                  >
+                    <Trash2 size={20} />
+                  </button>
                 </div>
-                <div className="flex-1">
-                  <p className="font-bold text-zinc-900">{item.product_name}</p>
-                  <p className="text-xs text-zinc-500">{item.supplier_name}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center bg-zinc-100 rounded-xl p-1">
+                
+                <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                  <div className="flex items-center bg-zinc-100 rounded-xl p-1 shrink-0">
                     <button 
                       onClick={() => onUpdateQuantity(item.product_name, item.supplier_name, -1)}
-                      className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:bg-white rounded-lg transition-all"
+                      className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center text-zinc-500 hover:bg-white rounded-lg transition-all"
                     >
                       <Minus size={16} />
                     </button>
                     <span className="w-10 text-center font-bold text-zinc-900">{item.quantity}</span>
                     <button 
                       onClick={() => onUpdateQuantity(item.product_name, item.supplier_name, 1)}
-                      className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:bg-white rounded-lg transition-all"
+                      className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center text-zinc-500 hover:bg-white rounded-lg transition-all"
                     >
                       <PlusIcon size={16} />
                     </button>
@@ -2193,7 +2219,7 @@ const CartView = ({ cart, onUpdateQuantity, onRemove, onPlaceOrder }: {
                   </div>
                   <button 
                     onClick={() => onRemove(item.product_name, item.supplier_name)}
-                    className="text-zinc-300 hover:text-red-500 transition-colors p-2"
+                    className="hidden sm:block text-zinc-300 hover:text-red-500 transition-colors p-2"
                   >
                     <Trash2 size={20} />
                   </button>
@@ -2259,12 +2285,12 @@ const SuppliersView = ({ onSelectSupplier }: { onSelectSupplier: (id: number) =>
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-              <th className="px-8 py-5">Поставщик</th>
-              <th className="px-8 py-5">Категории</th>
-              <th className="px-8 py-5">Рейтинг</th>
-              <th className="px-8 py-5">ИНН</th>
-              <th className="px-8 py-5 text-right">Действие</th>
+            <tr className="bg-zinc-50 text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+              <th className="px-4 sm:px-8 py-5 min-w-[200px]">Поставщик</th>
+              <th className="hidden sm:table-cell px-8 py-5">Категории</th>
+              <th className="hidden md:table-cell px-8 py-5">Рейтинг</th>
+              <th className="hidden lg:table-cell px-8 py-5">ИНН</th>
+              <th className="px-4 sm:px-8 py-5 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
@@ -2274,43 +2300,43 @@ const SuppliersView = ({ onSelectSupplier }: { onSelectSupplier: (id: number) =>
                 onClick={() => onSelectSupplier(s.id)}
                 className="hover:bg-zinc-50 transition-colors cursor-pointer group"
               >
-                <td className="px-8 py-5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+                <td className="px-4 sm:px-8 py-4 sm:py-5">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors shrink-0">
                       <Package size={20} />
                     </div>
-                    <div>
-                      <p className="font-bold text-zinc-900">{s.name}</p>
-                      <p className="text-xs text-zinc-500 line-clamp-1 max-w-xs">{s.description}</p>
+                    <div className="min-w-0">
+                      <p className="font-bold text-zinc-900 text-sm sm:text-base truncate">{s.name}</p>
+                      <p className="text-[10px] sm:text-xs text-zinc-500 line-clamp-1 truncate">{s.description}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-8 py-5">
+                <td className="hidden sm:table-cell px-8 py-5">
                   <div className="flex flex-wrap gap-1">
-                    {s.categories.slice(0, 3).map(c => (
-                      <span key={c} className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded uppercase tracking-wider">
+                    {s.categories.slice(0, 2).map(c => (
+                      <span key={c} className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">
                         {c}
                       </span>
                     ))}
-                    {s.categories.length > 3 && (
+                    {s.categories.length > 2 && (
                       <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded uppercase tracking-wider">
-                        +{s.categories.length - 3}
+                        +{s.categories.length - 2}
                       </span>
                     )}
                   </div>
                 </td>
-                <td className="px-8 py-5">
+                <td className="hidden md:table-cell px-8 py-5">
                   <div className="flex items-center gap-1 text-amber-600 font-bold text-sm">
                     <Star size={14} fill="currentColor" />
                     {s.rating}
                   </div>
                 </td>
-                <td className="px-8 py-5 text-sm text-zinc-500 font-medium">
+                <td className="hidden lg:table-cell px-8 py-5 text-sm text-zinc-500 font-medium">
                   {s.inn}
                 </td>
-                <td className="px-8 py-5 text-right">
-                  <button className="text-emerald-600 font-bold text-sm hover:text-emerald-800 transition-colors flex items-center gap-1 ml-auto">
-                    Профиль <ChevronRight size={16} />
+                <td className="px-4 sm:px-8 py-4 sm:py-5 text-right">
+                  <button className="text-emerald-600 font-bold text-xs hover:text-emerald-800 transition-colors flex items-center gap-1 ml-auto">
+                    <span className="hidden sm:inline">Профиль</span> <ChevronRight size={16} />
                   </button>
                 </td>
               </tr>
@@ -2359,41 +2385,42 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }
         <ArrowLeft size={20} /> Назад к списку
       </button>
 
-      <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
-        <div className="flex flex-col md:flex-row gap-8 items-start">
-          <div className="w-24 h-24 bg-emerald-50 rounded-3xl flex items-center justify-center text-emerald-600">
-            <Package size={48} />
+      <div className="bg-white border border-zinc-200 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-sm">
+        <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 items-start">
+          <div className="w-16 h-16 sm:w-24 sm:h-24 bg-emerald-50 rounded-2xl sm:rounded-3xl flex items-center justify-center text-emerald-600 shrink-0">
+            <Package size={32} className="sm:hidden" />
+            <Package size={48} className="hidden sm:block" />
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-4 mb-2">
-              <h2 className="text-3xl font-bold text-zinc-900">{supplier.name}</h2>
-              <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-3 py-1 rounded-xl text-sm font-bold">
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-zinc-900 truncate">{supplier.name}</h2>
+              <div className="w-fit flex items-center gap-1 bg-amber-50 text-amber-600 px-3 py-1 rounded-xl text-xs sm:text-sm font-bold">
                 <Star size={14} fill="currentColor" />
                 {supplier.rating}
               </div>
             </div>
-            <p className="text-zinc-500 max-w-2xl mb-4">{supplier.description}</p>
-            <div className="flex gap-6 text-sm">
+            <p className="text-sm sm:text-base text-zinc-500 max-w-2xl mb-4 line-clamp-3 sm:line-clamp-none">{supplier.description}</p>
+            <div className="flex flex-wrap gap-4 sm:gap-6 text-xs sm:text-sm">
               <div>
-                <span className="text-zinc-400 block mb-1">ИНН</span>
+                <span className="text-zinc-400 block mb-0.5">ИНН</span>
                 <span className="font-bold text-zinc-900">{supplier.inn}</span>
               </div>
               <div>
-                <span className="text-zinc-400 block mb-1">Email</span>
-                <span className="font-bold text-zinc-900">{supplier.email || 'Не указан'}</span>
+                <span className="text-zinc-400 block mb-0.5">Email</span>
+                <span className="font-bold text-zinc-900 truncate max-w-[150px] inline-block align-bottom">{supplier.email || 'Не указан'}</span>
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row lg:flex-col gap-3 w-full lg:w-auto">
             <button 
               onClick={() => onWriteMessage(supplier.id)}
-              className="bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200 w-full"
+              className="flex-1 sm:flex-none bg-zinc-900 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200 text-sm sm:text-base"
             >
               Написать сообщение
             </button>
             <button 
               onClick={() => document.getElementById('price-list-section')?.scrollIntoView({ behavior: 'smooth' })}
-              className="bg-emerald-50 text-emerald-600 px-8 py-4 rounded-2xl font-bold hover:bg-emerald-100 transition-all w-full flex items-center justify-center gap-2"
+              className="flex-1 sm:flex-none bg-emerald-50 text-emerald-600 px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold hover:bg-emerald-100 transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               <Package size={18} />
               Посмотреть прайс
@@ -2409,36 +2436,39 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                <th className="px-8 py-5">Товар</th>
-                <th className="px-8 py-5">Категория</th>
-                <th className="px-8 py-5">Цена</th>
-                <th className="px-8 py-5">Ед. изм.</th>
-                <th className="px-8 py-5">Действие</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {supplier.prices.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((p, i) => (
-                <tr key={i} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={p.product_name}>{p.product_name}</td>
-                  <td className="px-8 py-5">
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider truncate inline-block max-w-full" title={p.category}>
-                      {p.category}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5 font-bold text-zinc-900">{p.price} ₽</td>
-                  <td className="px-8 py-5 text-zinc-500">{p.unit}</td>
-                  <td className="px-8 py-5">
-                    <button 
-                      onClick={() => onAddToCart({ ...p, supplier_name: supplier.name, updated_at: p.updated_at })}
-                      className="text-emerald-600 hover:text-emerald-800 font-bold text-sm flex items-center gap-1"
-                    >
-                      <Plus size={16} /> В заказ
-                    </button>
-                  </td>
+                <tr className="bg-zinc-50 text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                  <th className="px-4 py-5 min-w-[200px]">Товар</th>
+                  <th className="hidden lg:table-cell px-8 py-5">Категория</th>
+                  <th className="px-4 py-5 font-right">Цена</th>
+                  <th className="hidden md:table-cell px-8 py-5">Ед. изм.</th>
+                  <th className="px-4 py-5 text-right">Действие</th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {supplier.prices.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((p, i) => (
+                  <tr key={i} className="hover:bg-zinc-50 transition-colors">
+                    <td className="px-4 py-5">
+                      <p className="font-bold text-zinc-900 text-sm sm:text-base truncate max-w-[200px]" title={p.product_name}>{p.product_name}</p>
+                      <p className="lg:hidden text-[10px] text-zinc-500 font-medium truncate mt-0.5">{p.category}</p>
+                    </td>
+                    <td className="hidden lg:table-cell px-8 py-5">
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider truncate inline-block max-w-[120px]" title={p.category}>
+                        {p.category}
+                      </span>
+                    </td>
+                    <td className="px-4 py-5 font-bold text-zinc-900 text-sm sm:text-base">{p.price} ₽</td>
+                    <td className="hidden md:table-cell px-8 py-5 text-zinc-500 text-sm">{p.unit}</td>
+                    <td className="px-4 py-5 text-right">
+                      <button 
+                        onClick={() => onAddToCart({ ...p, supplier_name: supplier.name, updated_at: p.updated_at })}
+                        className="text-emerald-600 hover:text-emerald-800 font-bold text-xs sm:text-sm flex items-center gap-1 ml-auto"
+                      >
+                        <Plus size={16} /> <span className="hidden sm:inline">В заказ</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
           </table>
         </div>
         <div className="p-6 border-t border-zinc-100">
@@ -2598,7 +2628,19 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const [chatTargetId, setChatTargetId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pageSize = 20;
+
+  const tabs = [
+    { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
+    { id: 'catalog', label: 'Каталог', icon: Package },
+    { id: 'suppliers', label: 'Поставщики', icon: Users },
+    { id: 'chat', label: 'Чат', icon: MessageSquare },
+    { id: 'invoices', label: 'Бухгалтерия', icon: FileText },
+    { id: 'cart', label: `Заказ (${cart.length})`, icon: ShoppingCart },
+    { id: 'integrations', label: 'Интеграции', icon: Zap },
+    { id: 'settings', label: 'Настройки', icon: Settings },
+  ];
 
   useEffect(() => {
     if (requestedTab) {
@@ -2709,21 +2751,12 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="space-y-8">
-        {/* Top Navigation */}
-        <div className="bg-white border border-zinc-200 rounded-3xl p-4 shadow-sm">
+    <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="space-y-4 sm:space-y-8">
+        {/* Desktop Navigation */}
+        <div className="hidden sm:block bg-white border border-zinc-200 rounded-3xl p-4 shadow-sm sticky top-16 z-40">
           <nav className="flex flex-wrap gap-2">
-            {[
-              { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
-              { id: 'catalog', label: 'Каталог', icon: Package },
-              { id: 'suppliers', label: 'Поставщики', icon: Users },
-              { id: 'chat', label: 'Чат', icon: MessageSquare },
-              { id: 'invoices', label: 'Бухгалтерия', icon: FileText },
-              { id: 'cart', label: `Заказ (${cart.length})`, icon: ShoppingCart },
-              { id: 'integrations', label: 'Интеграции', icon: Zap },
-              { id: 'settings', label: 'Настройки', icon: Settings },
-            ].map((tab) => (
+            {tabs.map((tab) => (
               <button 
                 key={tab.id}
                 onClick={() => {
@@ -2736,12 +2769,97 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                     : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
                 }`}
               >
-                <tab.icon size={18} className={activeTab === tab.id ? 'text-emerald-400' : ''} />
+                <tab.icon size={16} className={activeTab === tab.id ? 'text-emerald-400' : ''} />
                 {tab.label}
               </button>
             ))}
           </nav>
         </div>
+
+        {/* Mobile Navigation Trigger */}
+        <div className="sm:hidden flex items-center justify-between bg-white border border-zinc-200 rounded-2xl p-3 shadow-sm sticky top-16 z-40">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center text-white">
+              {(() => {
+                const ActiveIcon = tabs.find(t => t.id === activeTab)?.icon || LayoutDashboard;
+                return <ActiveIcon size={20} />;
+              })()}
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Раздел</p>
+              <p className="text-sm font-bold text-zinc-900">{tabs.find(t => t.id === activeTab)?.label}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setIsMenuOpen(true)}
+            className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-900 active:scale-95 transition-all"
+          >
+            <Menu size={20} />
+          </button>
+        </div>
+
+        {/* Mobile Menu Overlay */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMenuOpen(false)}
+                className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-[100] sm:hidden"
+              />
+              <motion.div 
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed right-0 top-0 bottom-0 w-[80%] max-w-sm bg-white z-[101] shadow-2xl p-6 sm:hidden flex flex-col"
+              >
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-xl font-bold text-zinc-900">Навигация</h2>
+                  <button 
+                    onClick={() => setIsMenuOpen(false)}
+                    className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-900"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <nav className="space-y-2 flex-1 overflow-y-auto no-scrollbar">
+                  {tabs.map((tab) => (
+                    <button 
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id as any);
+                        if (tab.id !== 'suppliers') setSelectedSupplierId(null);
+                        setIsMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-4 p-4 rounded-2xl text-left font-bold transition-all ${
+                        activeTab === tab.id 
+                          ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' 
+                          : 'bg-zinc-50 text-zinc-600'
+                      }`}
+                    >
+                      <tab.icon size={24} className={activeTab === tab.id ? 'text-white' : 'text-zinc-400'} />
+                      <span className="text-base">{tab.label}</span>
+                    </button>
+                  ))}
+                </nav>
+                <div className="mt-auto pt-6 border-t border-zinc-100">
+                   <div className="flex items-center gap-3 p-4 bg-zinc-50 rounded-2xl">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-bold">
+                        {user.name?.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                         <p className="text-sm font-bold text-zinc-900 truncate">{user.name}</p>
+                         <p className="text-xs text-zinc-500 truncate">{user.email}</p>
+                      </div>
+                   </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Main Content Area */}
         <div>
@@ -2755,35 +2873,35 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             className="space-y-8"
           >
             {/* Quick Actions & Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="md:col-span-2 flex gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <div className="lg:col-span-2 flex flex-col sm:flex-row gap-3">
                 <button 
                   onClick={() => setActiveTab('integrations')}
-                  className="flex-1 bg-white border border-zinc-200 text-zinc-900 px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-zinc-50 transition-all shadow-sm"
+                  className="flex-1 bg-white border border-zinc-200 text-zinc-900 px-4 sm:px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-zinc-50 transition-all shadow-sm text-sm sm:text-base active:scale-[0.98]"
                 >
-                  <FileText size={20} className="text-emerald-600" /> Выгрузить из iiko
+                  <FileText size={20} className="text-emerald-600 shrink-0" /> <span className="truncate">Выгрузить из iiko</span>
                 </button>
                 <button 
                   onClick={handleAnalyze}
                   disabled={loading}
-                  className="flex-1 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
+                  className="flex-1 bg-emerald-600 text-white px-4 sm:px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 text-sm sm:text-base active:scale-[0.98]"
                 >
-                  <Zap size={20} /> {loading ? 'Анализ...' : 'Анализ цен'}
+                  <Zap size={20} className="shrink-0" /> <span className="truncate">{loading ? 'Анализ...' : 'Анализ цен'}</span>
                 </button>
               </div>
               
               <div className="bg-zinc-900 text-white rounded-2xl p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Сезонность: Март</p>
-                  <p className="text-sm font-medium">Редис, Зелень</p>
+                  <p className="text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Сезонность: Март</p>
+                  <p className="text-xs sm:text-sm font-medium">Редис, Зелень</p>
                 </div>
                 <TrendingUp size={24} className="text-emerald-400 opacity-50" />
               </div>
 
               <div className="bg-white border border-zinc-200 rounded-2xl p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Экономия (мес)</p>
-                  <p className="text-xl font-bold text-emerald-600">145 200 ₽</p>
+                  <p className="text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Экономия (мес)</p>
+                  <p className="text-lg sm:text-xl font-bold text-emerald-600">145 200 ₽</p>
                 </div>
                 <TrendingDown size={24} className="text-emerald-600 opacity-20" />
               </div>
@@ -2840,15 +2958,15 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left table-fixed">
+                <table className="w-full text-left">
                   <thead>
-                    <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                      <th className="px-8 py-5 w-1/3">Товар</th>
-                      <th className="px-8 py-5">Категория</th>
-                      <th className="px-8 py-5">Поставщик</th>
-                      <th className="px-8 py-5">Цена</th>
-                      <th className="px-8 py-5">Обновлено</th>
-                      <th className="px-8 py-5 w-40"></th>
+                    <tr className="bg-zinc-50 text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                      <th className="px-4 sm:px-8 py-4 sm:py-5 min-w-[150px]">Товар</th>
+                      <th className="hidden lg:table-cell px-8 py-5">Категория</th>
+                      <th className="px-4 sm:px-8 py-4 sm:py-5 min-w-[120px]">Поставщик</th>
+                      <th className="px-4 sm:px-8 py-4 sm:py-5">Цена</th>
+                      <th className="hidden md:table-cell px-8 py-5">Обновлено</th>
+                      <th className="px-4 sm:px-8 py-4 sm:py-5 text-right"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 relative">
@@ -2858,24 +2976,25 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                         onClick={() => setSelectedPrice(p)}
                         className="hover:bg-zinc-50 transition-colors group cursor-pointer"
                       >
-                        <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={p.product_name}>{p.product_name}</td>
-                        <td className="px-8 py-5">
-                          <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg truncate inline-block max-w-full" title={p.category}>{p.category}</span>
+                        <td className="px-4 sm:px-8 py-4 sm:py-5 font-bold text-zinc-900 text-sm sm:text-base">
+                          <p className="truncate sm:whitespace-normal" title={p.product_name}>{p.product_name}</p>
+                          <span className="lg:hidden block text-[10px] text-zinc-400 mt-1 uppercase font-bold tracking-tight">{p.category}</span>
                         </td>
-                        <td className="px-8 py-5 text-sm text-zinc-700 font-medium truncate" title={p.supplier_name}>{p.supplier_name}</td>
-                        <td className="px-8 py-5 font-bold text-zinc-900 text-lg">{p.price} ₽</td>
-                        <td className="px-8 py-5 text-xs text-zinc-400">{new Date(p.updated_at).toLocaleDateString()}</td>
-                        <td className="px-8 py-5 text-right">
-                          <div className="flex items-center justify-end gap-3">
+                        <td className="hidden lg:table-cell px-8 py-5">
+                          <span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">{p.category}</span>
+                        </td>
+                        <td className="px-4 sm:px-8 py-4 sm:py-5 text-xs sm:text-sm text-zinc-700 font-medium">{p.supplier_name}</td>
+                        <td className="px-4 sm:px-8 py-4 sm:py-5 font-bold text-zinc-900 text-sm sm:text-lg whitespace-nowrap">{p.price} ₽</td>
+                        <td className="hidden md:table-cell px-8 py-5 text-xs text-zinc-400">{new Date(p.updated_at).toLocaleDateString()}</td>
+                        <td className="px-4 sm:px-8 py-4 sm:py-5 text-right">
+                          <div className="flex items-center justify-end gap-1 sm:gap-3">
                             <button 
                               onClick={(e) => { e.stopPropagation(); addToCart(p); }}
-                              className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1"
+                              className="bg-emerald-50 text-emerald-600 px-2 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1"
                             >
-                              <Plus size={14} /> В заказ
+                              <Plus size={12} /> <span className="hidden sm:inline">В заказ</span>
                             </button>
-                            <button className="text-zinc-400 hover:text-zinc-600 transition-all">
-                              <ChevronRight size={18} />
-                            </button>
+                            <ChevronRight size={16} className="text-zinc-300 sm:block hidden" />
                           </div>
                         </td>
                       </tr>
@@ -2883,33 +3002,32 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                     {!user.subscription?.active && filteredPrices.length > 3 && (
                       <>
                         {/* Blurred rows */}
-                        {[1, 2, 3].map((_, i) => (
+                        {[1, 2].map((_, i) => (
                           <tr key={`blur-${i}`} className="blur-[2px] opacity-30 select-none pointer-events-none">
-                            <td className="px-8 py-5 font-bold text-zinc-900">Скрытый товар</td>
-                            <td className="px-8 py-5"><span className="text-xs font-bold px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg">Категория</span></td>
-                            <td className="px-8 py-5 text-sm text-zinc-700 font-medium">Поставщик</td>
-                            <td className="px-8 py-5 font-bold text-zinc-900 text-lg">000 ₽</td>
-                            <td className="px-8 py-5 text-xs text-zinc-400">00.00.0000</td>
-                            <td className="px-8 py-5"></td>
+                            <td className="px-4 sm:px-8 py-5 font-bold text-zinc-900">Скрытый товар</td>
+                            <td className="hidden lg:table-cell px-8 py-5">Категория</td>
+                            <td className="px-4 sm:px-8 py-5">Поставщик</td>
+                            <td className="px-4 sm:px-8 py-5">000 ₽</td>
+                            <td className="hidden md:table-cell px-8 py-5">00.00.0000</td>
+                            <td className="px-4 sm:px-8 py-5"></td>
                           </tr>
                         ))}
                         {/* Overlay CTA */}
-                        <tr className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-white via-white/90 to-transparent flex items-center justify-center z-10">
-                          <td colSpan={6} className="text-center pb-12">
-                            <div className="bg-white p-8 rounded-3xl shadow-2xl border border-zinc-100 max-w-md mx-auto">
-                              <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <Lock className="text-emerald-600" size={32} />
+                        <tr className="absolute inset-x-0 bottom-0 h-72 sm:h-64 bg-gradient-to-t from-white via-white/95 to-transparent flex items-center justify-center z-10 px-4">
+                          <td colSpan={6} className="text-center pb-8 w-full">
+                            <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl border border-zinc-100 max-w-sm mx-auto">
+                              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <Lock className="text-emerald-600" size={24} />
                               </div>
-                              <h3 className="text-xl font-bold text-zinc-900 mb-2">Полный доступ ограничен</h3>
-                              <p className="text-zinc-500 mb-6">
-                                В бесплатной версии доступно сравнение только 3 товаров. 
-                                Оплатите подписку, чтобы видеть все цены и экономить по-настоящему.
+                              <h3 className="text-lg sm:text-xl font-bold text-zinc-900 mb-2">Полный доступ ограничен</h3>
+                              <p className="text-xs sm:text-sm text-zinc-500 mb-6">
+                                Активируйте подписку, чтобы видеть все цены и экономить по-настоящему.
                               </p>
                               <button 
                                 onClick={() => onPayment('monthly')}
-                                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                                className="w-full bg-emerald-600 text-white py-3 sm:py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg"
                               >
-                                Активировать подписку
+                                Активировать
                               </button>
                             </div>
                           </td>
@@ -3064,7 +3182,7 @@ const SystemSettingsView = () => {
   const [isTestingEmail, setIsTestingEmail] = useState(false);
   const [testEmailResult, setTestEmailResult] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
   const [isTestingGemini, setIsTestingGemini] = useState(false);
-  const [testGeminiResult, setTestGeminiResult] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [testGeminiResult, setTestGeminiResult] = useState<{ text: string, details?: string, type: 'success' | 'error' } | null>(null);
 
   const toggleSecret = (key: string) => {
     setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }));
@@ -3604,7 +3722,7 @@ const SystemSettingsView = () => {
               {/* Email Templates */}
               <div className="space-y-6">
                 <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-                  <Mail size={20} className="text-purple-500" />
+                  <Mail size={20} className="text-emerald-500" />
                   Шаблоны писем
                 </h3>
                 <div className="space-y-8">
@@ -4131,7 +4249,15 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [currentPageUsers, setCurrentPageUsers] = useState(1);
   const [currentPageInvoices, setCurrentPageInvoices] = useState(1);
   const [currentPagePrices, setCurrentPagePrices] = useState(1);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pageSize = 20;
+
+  const adminTabs = [
+    { id: 'users', label: 'Пользователи', icon: Users },
+    { id: 'invoices', label: 'Накладные', icon: FileText },
+    { id: 'prices', label: 'Прайс-листы', icon: Tag },
+    { id: 'settings', label: 'Настройки', icon: Settings },
+  ];
 
   const [confirmData, setConfirmData] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
 
@@ -4188,7 +4314,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-6 sm:py-10">
       <ConfirmModal 
         isOpen={!!confirmData?.isOpen}
         title={confirmData?.title || ''}
@@ -4196,56 +4322,107 @@ const AdminDashboard = ({ user }: { user: User }) => {
         onConfirm={confirmData?.onConfirm || (() => {})}
         onClose={() => setConfirmData(null)}
       />
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-900">Панель администратора</h1>
-          <p className="text-zinc-500">Полный контроль над системой</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900">Панель администратора</h1>
+          <p className="text-sm text-zinc-500">Полный контроль над системой</p>
         </div>
-        <div className="flex bg-zinc-100 p-1 rounded-2xl">
-          <button 
-            onClick={() => setActiveAdminTab('users')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'users' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
-          >
-            Пользователи
-          </button>
-          <button 
-            onClick={() => setActiveAdminTab('invoices')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'invoices' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
-          >
-            Накладные
-          </button>
-          <button 
-            onClick={() => setActiveAdminTab('prices')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'prices' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
-          >
-            Прайс-листы
-          </button>
-          <button 
-            onClick={() => setActiveAdminTab('settings')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'settings' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
-          >
-            Настройки
-          </button>
+        
+        {/* Desktop Tabs */}
+        <div className="hidden sm:flex bg-zinc-100 p-1 rounded-xl sm:rounded-2xl">
+          {adminTabs.map(tab => (
+            <button 
+              key={tab.id}
+              onClick={() => setActiveAdminTab(tab.id as any)}
+              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeAdminTab === tab.id ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Mobile Nav Trigger */}
+        <div className="sm:hidden w-full flex items-center justify-between bg-white border border-zinc-200 rounded-2xl p-3 shadow-sm">
+           <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-white">
+                 {(() => {
+                    const ActiveIcon = adminTabs.find(t => t.id === activeAdminTab)?.icon || Shield;
+                    return <ActiveIcon size={20} />;
+                 })()}
+              </div>
+              <p className="font-bold text-zinc-900">{adminTabs.find(t => t.id === activeAdminTab)?.label}</p>
+           </div>
+           <button 
+              onClick={() => setIsMenuOpen(true)}
+              className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-900"
+            >
+              <Menu size={20} />
+            </button>
         </div>
       </div>
+
+      {/* Mobile Menu Overlay for Admin */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMenuOpen(false)}
+              className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-[100] sm:hidden"
+            />
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              className="fixed right-0 top-0 bottom-0 w-[80%] max-w-sm bg-white z-[101] shadow-2xl p-6 sm:hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-xl font-bold text-zinc-900">Админ-панель</h2>
+                <button onClick={() => setIsMenuOpen(false)} className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center">
+                  <X size={20} />
+                </button>
+              </div>
+              <nav className="space-y-2">
+                {adminTabs.map((tab) => (
+                  <button 
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveAdminTab(tab.id as any);
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-4 p-4 rounded-2xl text-left font-bold transition-all ${
+                      activeAdminTab === tab.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-zinc-50 text-zinc-600'
+                    }`}
+                  >
+                    <tab.icon size={24} />
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
       
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-          <div className="bg-white border border-zinc-200 rounded-3xl p-6">
-            <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Пользователей</p>
-            <p className="text-4xl font-bold text-zinc-900">{stats.userCount}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10">
+          <div className="bg-white border border-zinc-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6">
+            <p className="text-[10px] sm:text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Пользователи</p>
+            <p className="text-2xl sm:text-4xl font-bold text-zinc-900">{stats.userCount}</p>
           </div>
-          <div className="bg-white border border-zinc-200 rounded-3xl p-6">
-            <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Накладных</p>
-            <p className="text-4xl font-bold text-zinc-900">{stats.invoiceCount}</p>
+          <div className="bg-white border border-zinc-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6">
+            <p className="text-[10px] sm:text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Накладные</p>
+            <p className="text-2xl sm:text-4xl font-bold text-zinc-900">{stats.invoiceCount}</p>
           </div>
-          <div className="bg-white border border-zinc-200 rounded-3xl p-6">
-            <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Сообщений</p>
-            <p className="text-4xl font-bold text-zinc-900">{stats.messageCount}</p>
+          <div className="bg-white border border-zinc-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6">
+            <p className="text-[10px] sm:text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Сообщения</p>
+            <p className="text-2xl sm:text-4xl font-bold text-zinc-900">{stats.messageCount}</p>
           </div>
-          <div className="bg-white border border-zinc-200 rounded-3xl p-6">
-            <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Объем (₽)</p>
-            <p className="text-4xl font-bold text-emerald-600">{stats.totalVolume.toLocaleString()}</p>
+          <div className="bg-white border border-zinc-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6">
+            <p className="text-[10px] sm:text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Объем</p>
+            <p className="text-xl sm:text-4xl font-bold text-emerald-600 truncate">{stats.totalVolume.toLocaleString()} ₽</p>
           </div>
         </div>
       )}
@@ -4272,14 +4449,14 @@ const AdminDashboard = ({ user }: { user: User }) => {
                   {isLoading && <RefreshCw size={20} className="animate-spin text-zinc-400" />}
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left table-fixed">
+                  <table className="w-full text-left min-w-[700px]">
                     <thead>
-                      <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                        <th className="px-8 py-5 w-16">ID</th>
-                        <th className="px-8 py-5 w-32">ИНН</th>
-                        <th className="px-8 py-5">Название</th>
-                        <th className="px-8 py-5 w-32">Тип</th>
-                        <th className="px-8 py-5 w-32">Подписка</th>
+                      <tr className="bg-zinc-50 text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                        <th className="px-4 sm:px-8 py-5 w-12 sm:w-16">ID</th>
+                        <th className="px-4 sm:px-8 py-5 w-28 sm:w-32">ИНН</th>
+                        <th className="px-4 sm:px-8 py-5">Название</th>
+                        <th className="px-4 sm:px-8 py-5 w-28 sm:w-32">Тип</th>
+                        <th className="px-4 sm:px-8 py-5 w-28 sm:w-32">Подписка</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
@@ -4287,20 +4464,20 @@ const AdminDashboard = ({ user }: { user: User }) => {
                         const sub = typeof u.subscription === 'string' ? JSON.parse(u.subscription) : u.subscription;
                         return (
                           <tr key={i} className="hover:bg-zinc-50 transition-colors cursor-pointer" onClick={() => setSelectedUser(u)}>
-                            <td className="px-8 py-5 text-zinc-500 text-xs">#{u.id}</td>
-                            <td className="px-8 py-5 font-bold text-zinc-900 text-sm">{u.inn}</td>
-                            <td className="px-8 py-5 font-medium text-zinc-700 truncate" title={u.name}>{u.name}</td>
-                            <td className="px-8 py-5">
-                              <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
-                                u.type === 'admin' ? 'bg-purple-50 text-purple-600' : 
+                            <td className="px-4 sm:px-8 py-5 text-zinc-500 text-xs truncate">#{u.id}</td>
+                            <td className="px-4 sm:px-8 py-5 font-bold text-zinc-900 text-xs sm:text-sm truncate">{u.inn}</td>
+                            <td className="px-4 sm:px-8 py-5 font-medium text-zinc-700 truncate max-w-[150px] sm:max-w-none" title={u.name}>{u.name}</td>
+                            <td className="px-4 sm:px-8 py-5">
+                              <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 sm:px-2 sm:py-1 rounded whitespace-nowrap ${
+                                u.type === 'admin' ? 'bg-emerald-50 text-emerald-600' : 
                                 u.type === 'restaurant' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
                               }`}>
                                 {u.type === 'admin' ? 'Админ' : u.type === 'restaurant' ? 'Ресторан' : 'Поставщик'}
                               </span>
                             </td>
-                            <td className="px-8 py-5">
+                            <td className="px-4 sm:px-8 py-5">
                               {u.type === 'restaurant' ? (
-                                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded border ${
+                                <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 sm:px-2 sm:py-1 rounded border whitespace-nowrap ${
                                   sub?.status === 'active' 
                                     ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
                                     : 'bg-zinc-50 text-zinc-400 border-zinc-200'
@@ -4338,15 +4515,15 @@ const AdminDashboard = ({ user }: { user: User }) => {
               <h2 className="text-xl font-bold text-zinc-900">Модерация накладных</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left table-fixed">
+              <table className="w-full text-left min-w-[800px]">
                 <thead>
-                  <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                    <th className="px-8 py-5">Ресторан</th>
-                    <th className="px-8 py-5">Поставщик</th>
-                    <th className="px-8 py-5 w-32">Сумма</th>
-                    <th className="px-8 py-5 w-32">Статус</th>
-                    <th className="px-8 py-5 w-32">Дата</th>
-                    <th className="px-8 py-5 w-40">Действия</th>
+                  <tr className="bg-zinc-50 text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                    <th className="px-4 sm:px-8 py-5">Ресторан</th>
+                    <th className="px-4 sm:px-8 py-5">Поставщик</th>
+                    <th className="px-4 sm:px-8 py-5 w-28 sm:w-32">Сумма</th>
+                    <th className="px-4 sm:px-8 py-5 w-28 sm:w-32">Статус</th>
+                    <th className="px-4 sm:px-8 py-5 w-28 sm:w-32">Дата</th>
+                    <th className="px-4 sm:px-8 py-5 w-36 sm:w-40">Действия</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
@@ -4356,19 +4533,19 @@ const AdminDashboard = ({ user }: { user: User }) => {
                       onClick={() => setSelectedInvoice(inv)}
                       className="hover:bg-zinc-50 transition-colors cursor-pointer"
                     >
-                      <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={inv.restaurant_name}>{inv.restaurant_name}</td>
-                      <td className="px-8 py-5 text-zinc-700 truncate" title={inv.supplier_name}>{inv.supplier_name}</td>
-                      <td className="px-8 py-5 font-bold text-emerald-600">{inv.amount} ₽</td>
-                      <td className="px-8 py-5">
-                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
+                      <td className="px-4 sm:px-8 py-5 font-bold text-zinc-900 text-sm truncate max-w-[150px] sm:max-w-none" title={inv.restaurant_name}>{inv.restaurant_name}</td>
+                      <td className="px-4 sm:px-8 py-5 text-zinc-700 text-sm truncate max-w-[150px] sm:max-w-none" title={inv.supplier_name}>{inv.supplier_name}</td>
+                      <td className="px-4 sm:px-8 py-5 font-bold text-emerald-600 text-sm whitespace-nowrap">{inv.amount} ₽</td>
+                      <td className="px-4 sm:px-8 py-5">
+                        <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 sm:px-2 sm:py-1 rounded whitespace-nowrap ${
                           inv.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
                           inv.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
                         }`}>
                           {inv.status === 'pending' ? 'Ожидает' : inv.status === 'approved' ? 'Одобрен' : 'Отклонен'}
                         </span>
                       </td>
-                      <td className="px-8 py-5 text-xs text-zinc-400">{new Date(inv.created_at).toLocaleDateString()}</td>
-                      <td className="px-8 py-5 space-x-2">
+                      <td className="px-4 sm:px-8 py-5 text-[10px] sm:text-xs text-zinc-400">{new Date(inv.created_at).toLocaleDateString()}</td>
+                      <td className="px-4 sm:px-8 py-5 space-x-2">
                         {inv.status === 'pending' && (
                           <>
                             <button 
@@ -4412,15 +4589,15 @@ const AdminDashboard = ({ user }: { user: User }) => {
               <h2 className="text-xl font-bold text-zinc-900">Управление прайсами</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left table-fixed">
+              <table className="w-full text-left min-w-[800px]">
                 <thead>
-                  <tr className="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
-                    <th className="px-8 py-5 w-1/3">Товар</th>
-                    <th className="px-8 py-5">Категория</th>
-                    <th className="px-8 py-5">Поставщик</th>
-                    <th className="px-8 py-5 w-32">Цена</th>
-                    <th className="px-8 py-5 w-32">Обновлено</th>
-                    <th className="px-8 py-5 w-32">Действия</th>
+                  <tr className="bg-zinc-50 text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                    <th className="px-4 sm:px-8 py-5">Товар</th>
+                    <th className="px-4 sm:px-8 py-5">Категория</th>
+                    <th className="px-4 sm:px-8 py-5">Поставщик</th>
+                    <th className="px-4 sm:px-8 py-5 w-28 sm:w-32">Цена</th>
+                    <th className="px-4 sm:px-8 py-5 w-28 sm:w-32">Обновлено</th>
+                    <th className="px-4 sm:px-8 py-5 w-32">Действия</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
@@ -4430,12 +4607,12 @@ const AdminDashboard = ({ user }: { user: User }) => {
                       onClick={() => setSelectedPrice(p)}
                       className="hover:bg-zinc-50 transition-colors cursor-pointer"
                     >
-                      <td className="px-8 py-5 font-bold text-zinc-900 truncate" title={p.product_name}>{p.product_name}</td>
-                      <td className="px-8 py-5 text-sm text-zinc-500 truncate" title={p.category}>{p.category}</td>
-                      <td className="px-8 py-5 text-sm text-zinc-700 truncate" title={p.supplier_name}>{p.supplier_name}</td>
-                      <td className="px-8 py-5 font-bold text-zinc-900">{p.price} ₽</td>
-                      <td className="px-8 py-5 text-xs text-zinc-400">{new Date(p.updated_at).toLocaleDateString()}</td>
-                      <td className="px-8 py-5">
+                      <td className="px-4 sm:px-8 py-5 font-bold text-zinc-900 text-sm truncate max-w-[150px] sm:max-w-none" title={p.product_name}>{p.product_name}</td>
+                      <td className="px-4 sm:px-8 py-5 text-sm text-zinc-500 truncate max-w-[120px] sm:max-w-none" title={p.category}>{p.category}</td>
+                      <td className="px-4 sm:px-8 py-5 text-sm text-zinc-700 truncate max-w-[150px] sm:max-w-none" title={p.supplier_name}>{p.supplier_name}</td>
+                      <td className="px-4 sm:px-8 py-5 font-bold text-zinc-900 text-sm whitespace-nowrap">{p.price} ₽</td>
+                      <td className="px-4 sm:px-8 py-5 text-[10px] sm:text-xs text-zinc-400">{new Date(p.updated_at).toLocaleDateString()}</td>
+                      <td className="px-4 sm:px-8 py-5">
                         <button 
                           onClick={(e) => { e.stopPropagation(); deletePrice(p.id); }}
                           className="text-red-500 hover:text-red-700 font-bold text-sm"
@@ -4503,7 +4680,18 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
   const [stats, setStats] = useState({ productCount: 0, orderCount: 0, totalVolume: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [currentPageOrders, setCurrentPageOrders] = useState(1);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pageSize = 20;
+
+  const supplierTabs = [
+    { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
+    { id: 'prices', label: 'Прайс-листы', icon: Package },
+    { id: 'chat', label: 'Чат', icon: MessageSquare },
+    { id: 'orders', label: 'Заказы', icon: FileText },
+    { id: 'import', label: 'Импорт', icon: Download },
+    { id: 'integrations', label: 'Интеграция 1С', icon: Zap },
+    { id: 'settings', label: 'Настройки', icon: Settings },
+  ];
 
   const fetchStats = () => {
     fetch(`/api/supplier/${user.id}/stats`)
@@ -4632,18 +4820,10 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
       />
       
       <div className="space-y-8">
-        {/* Top Navigation */}
-        <div className="bg-white border border-zinc-200 rounded-3xl p-4 shadow-sm">
+        {/* Desktop Navigation */}
+        <div className="hidden sm:block bg-white border border-zinc-200 rounded-3xl p-4 shadow-sm">
           <nav className="flex flex-wrap gap-2">
-            {[
-              { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
-              { id: 'prices', label: 'Прайс-листы', icon: Package },
-              { id: 'chat', label: 'Чат', icon: MessageSquare },
-              { id: 'orders', label: 'Заказы', icon: FileText },
-              { id: 'import', label: 'Импорт', icon: Download },
-              { id: 'integrations', label: 'Интеграция 1С', icon: Zap },
-              { id: 'settings', label: 'Настройки', icon: Settings },
-            ].map((tab) => (
+            {supplierTabs.map((tab) => (
               <button 
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -4659,6 +4839,70 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
             ))}
           </nav>
         </div>
+
+        {/* Mobile Navigation Trigger */}
+        <div className="sm:hidden flex items-center justify-between bg-white border border-zinc-200 rounded-2xl p-4 shadow-sm">
+           <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center text-white">
+                 {(() => {
+                    const ActiveIcon = supplierTabs.find(t => t.id === activeTab)?.icon || LayoutDashboard;
+                    return <ActiveIcon size={20} />;
+                 })()}
+              </div>
+              <p className="font-bold text-zinc-900">{supplierTabs.find(t => t.id === activeTab)?.label}</p>
+           </div>
+           <button 
+              onClick={() => setIsMenuOpen(true)}
+              className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-900"
+            >
+              <Menu size={20} />
+            </button>
+        </div>
+
+        {/* Mobile Menu Overlay for Supplier */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMenuOpen(false)}
+                className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-[100] sm:hidden"
+              />
+              <motion.div 
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                className="fixed right-0 top-0 bottom-0 w-[80%] max-w-sm bg-white z-[101] shadow-2xl p-6 sm:hidden flex flex-col"
+              >
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-xl font-bold text-zinc-900">Меню поставщика</h2>
+                  <button onClick={() => setIsMenuOpen(false)} className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center">
+                    <X size={20} />
+                  </button>
+                </div>
+                <nav className="space-y-2">
+                  {supplierTabs.map((tab) => (
+                    <button 
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id as any);
+                        setIsMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-4 p-4 rounded-2xl text-left font-bold transition-all ${
+                        activeTab === tab.id ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-50 text-zinc-600'
+                      }`}
+                    >
+                      <tab.icon size={24} />
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </nav>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Main Content Area */}
         <div>
@@ -5549,11 +5793,16 @@ export default function App() {
               </div>
               <span className="font-bold tracking-tight text-zinc-900">Агрегатор</span>
             </div>
-            <div className="flex gap-8 text-sm text-zinc-500 font-medium">
-              <button onClick={() => setIsOfferOpen(true)} className="hover:text-zinc-900">Публичная оферта</button>
-              <a href="#" className="hover:text-zinc-900">О сервисе</a>
-              <a href="#" className="hover:text-zinc-900">Тарифы</a>
-              <a href="#" className="hover:text-zinc-900">Помощь</a>
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm text-zinc-500 font-medium">
+              <button 
+                onClick={() => setIsOfferOpen(true)} 
+                className="hover:text-zinc-900 transition-colors py-1"
+              >
+                Публичная оферта
+              </button>
+              <a href="#" className="hover:text-zinc-900 transition-colors py-1">О сервисе</a>
+              <a href="#" className="hover:text-zinc-900 transition-colors py-1">Тарифы</a>
+              <a href="#" className="hover:text-zinc-900 transition-colors py-1">Помощь</a>
             </div>
             <p className="text-xs text-zinc-400">© 2026 Агрегатор HoReCa. Все права защищены.</p>
           </div>
