@@ -983,30 +983,75 @@ const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boo
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [recognizedItems, setRecognizedItems] = useState<any[]>([]);
 
+  const processResult = (result: any) => {
+    if (result) {
+      if (result.amount) {
+        setAmount(result.amount.toString());
+      } else if (result.items && result.items.length > 0) {
+        const total = result.items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
+        setAmount(total.toString());
+      }
+      if (result.items) setRecognizedItems(result.items);
+    }
+  };
+
   const handleAIRecognize = async () => {
     if (!file) return;
     setIsRecognizing(true);
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      try {
-        const result = await recognizeInvoice(base64);
-        if (result) {
-          if (result.amount) {
-            setAmount(result.amount.toString());
-          } else if (result.items && result.items.length > 0) {
-            const total = result.items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
-            setAmount(total.toString());
-          }
-          if (result.items) setRecognizedItems(result.items);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsRecognizing(false);
+    
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    
+    try {
+      if (['xlsx', 'xls', 'csv'].includes(ext || '')) {
+         const reader = new FileReader();
+         reader.onload = async (e) => {
+            try {
+              const bstr = e.target?.result;
+              const wb = XLSX.read(bstr, { type: 'binary' });
+              const ws = wb.Sheets[wb.SheetNames[0]];
+              const csv = XLSX.utils.sheet_to_csv(ws);
+              const result = await recognizeInvoice(undefined, csv);
+              processResult(result);
+            } catch (err) {
+              console.error("Excel recognition error:", err);
+            } finally {
+              setIsRecognizing(false);
+            }
+         };
+         reader.readAsBinaryString(file);
+      } else if (ext === 'xml') {
+         const reader = new FileReader();
+         reader.onload = async (e) => {
+            try {
+              const text = e.target?.result as string;
+              const result = await recognizeInvoice(undefined, text);
+              processResult(result);
+            } catch (err) {
+              console.error("XML recognition error:", err);
+            } finally {
+              setIsRecognizing(false);
+            }
+         };
+         reader.readAsText(file);
+      } else {
+         const reader = new FileReader();
+         reader.onloadend = async () => {
+           try {
+             const base64 = reader.result as string;
+             const result = await recognizeInvoice(base64);
+             processResult(result);
+           } catch (err) {
+             console.error("Image recognition error:", err);
+           } finally {
+             setIsRecognizing(false);
+           }
+         };
+         reader.readAsDataURL(file);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      setIsRecognizing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1086,7 +1131,7 @@ const UploadInvoiceModal = ({ isOpen, onClose, onUpload, userId }: { isOpen: boo
               <input 
                 type="file" 
                 required
-                accept="image/*,.pdf"
+                accept="image/*,.pdf,.xlsx,.xls,.csv,.xml"
                 onChange={e => setFile(e.target.files?.[0] || null)}
                 className="hidden"
                 id="invoice-file"

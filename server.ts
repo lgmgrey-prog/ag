@@ -404,14 +404,6 @@ function generateRobokassaUrl(invId: number, outSum: number, description: string
 async function startServer() {
   const app = express();
   app.set('trust proxy', 1);
-  
-  // Prevent browser caching of redirects
-  app.use((req, res, next) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    next();
-  });
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -419,8 +411,8 @@ async function startServer() {
     name: 'session',
     keys: [getSystemSettings().session_secret],
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    secure: true,
-    sameSite: 'none'
+    secure: false, // Изменено для совместимости с превью
+    sameSite: 'lax'
   }));
 
   const getOAuth2Client = () => {
@@ -1655,7 +1647,16 @@ async function startServer() {
 
       res.json({ success: true, organization: organizations[0] });
     } catch (err: any) {
-      const iikoError = err.response?.data?.errorDescription || err.response?.data?.message || err.message;
+      const iikoRawError = err.response?.data?.errorDescription || err.response?.data?.message || err.message;
+      let iikoError = iikoRawError;
+      
+      // Humanize common iiko errors
+      if (iikoRawError.includes("license") && iikoRawError.includes("expired")) {
+        iikoError = "Срок действия вашей лицензии iikoCloud API истек. Пожалуйста, продлите лицензию в личном кабинете iiko или обратитесь в поддержку iiko.";
+      } else if (iikoRawError.includes("Login is not authorized")) {
+        iikoError = "Ошибка авторизации: неверный API-ключ или у пользователя нет прав для работы с Cloud API.";
+      }
+
       res.status(500).json({ error: "Ошибка подключения к iiko", details: iikoError });
     }
   });
@@ -1765,7 +1766,13 @@ async function startServer() {
             const cat = groupMap.get(p.parentGroup) || 'Без категории';
             insertProduct.run(p.name, cat, p.measureUnit || 'шт');
             const product = getProduct.get(p.name) as any;
-            if (product) linkProduct.run(userId, product.id);
+            if (product) {
+              linkProduct.run(userId, product.id);
+              if (p.price > 0) {
+                db.prepare("UPDATE restaurant_products SET current_price = ? WHERE restaurant_id = ? AND product_id = ?")
+                  .run(p.price, userId, product.id);
+              }
+            }
             processedNames.add(p.name);
             count++;
           }
@@ -1795,13 +1802,39 @@ async function startServer() {
           categories.forEach((cat: any) => {
             (cat.items || []).forEach((item: any) => {
               const name = item.name || item.buttonText;
-              if (name && !processedNames.has(name)) {
-                insertProduct.run(name, cat.name || 'Без категории', item.unit || 'шт');
-                const product = getProduct.get(name) as any;
-                if (product) linkProduct.run(userId, product.id);
-                processedNames.add(name);
-                count++;
-                addedInMenu++;
+              if (name) {
+                // Determine price for this specific organization
+                let currentItemPrice = 0;
+                if (item.itemPrices && Array.isArray(item.itemPrices)) {
+                  const orgPrice = item.itemPrices.find((ip: any) => ip.organizationId === integration.organization_id);
+                  if (orgPrice) {
+                    currentItemPrice = orgPrice.price || 0;
+                  } else if (item.itemPrices.length > 0) {
+                    // Fallback to first available price if organization-specific not found
+                    currentItemPrice = item.itemPrices[0].price || 0;
+                  }
+                }
+
+                if (!processedNames.has(name)) {
+                  insertProduct.run(name, cat.name || 'Без категории', item.unit || 'шт');
+                  const product = getProduct.get(name) as any;
+                  if (product) {
+                    // Link if not linked, and update price
+                    linkProduct.run(userId, product.id);
+                    db.prepare("UPDATE restaurant_products SET current_price = ? WHERE restaurant_id = ? AND product_id = ?")
+                      .run(currentItemPrice, userId, product.id);
+                  }
+                  processedNames.add(name);
+                  count++;
+                  addedInMenu++;
+                } else {
+                  // If product was already added from v1, we still want to update its price if we found it in v2
+                  const product = getProduct.get(name) as any;
+                  if (product && currentItemPrice > 0) {
+                    db.prepare("UPDATE restaurant_products SET current_price = ? WHERE restaurant_id = ? AND product_id = ?")
+                      .run(currentItemPrice, userId, product.id);
+                  }
+                }
               }
             });
           });

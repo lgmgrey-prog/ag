@@ -98,7 +98,7 @@ export async function analyzePrices(matrix: any[], marketPrices: any[]) {
   }
 }
 
-export async function recognizeInvoice(base64Image: string) {
+export async function recognizeInvoice(base64Image?: string, textContent?: string) {
   const apiKey = await getApiKey();
 
   if (!apiKey) {
@@ -116,19 +116,32 @@ export async function recognizeInvoice(base64Image: string) {
   const ai = new GoogleGenAI({ apiKey });
   
   try {
+    const contents: any[] = [];
+    
+    if (base64Image) {
+       // Detect mime type from base64 string
+       const mimeMatch = base64Image.match(/^data:([^;]+);base64,/);
+       const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+       
+       contents.push({
+         inlineData: {
+           mimeType: mimeType,
+           data: base64Image.split(',')[1]
+         }
+       });
+    }
+
+    if (textContent) {
+      contents.push({ text: `Текстовое содержимое файла (CSV/XML/Таблица):\n${textContent}` });
+    }
+
+    contents.push({
+      text: "Извлеки данные из этой накладной. Верни JSON с полями 'amount' (общая сумма), 'supplier' (название поставщика) и 'items' (массив объектов {name, quantity, unit, price, total})."
+    });
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: [
-        {
-          inlineData: {
-            mimeType: "image/jpeg",
-            data: base64Image.split(',')[1]
-          }
-        },
-        {
-          text: "Extract data from this invoice. Return JSON with 'amount' (total sum), 'supplier' (name), and 'items' (array of {name, quantity, unit, price, total})."
-        }
-      ],
+      contents: contents,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
