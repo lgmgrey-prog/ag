@@ -174,11 +174,27 @@ try {
       value TEXT
     );
   `);
-  const existingOffer = db.prepare("SELECT * FROM global_settings WHERE key = 'public_offer'").get();
-  if (!existingOffer) {
-    db.prepare("INSERT INTO global_settings (key, value) VALUES (?, ?)").run('public_offer', '# Публичная оферта\n\nЗдесь будет текст вашей оферты. Вы можете редактировать его в панели администратора.');
+  const keys = [
+    { key: 'public_offer', value: '# Публичная оферта\n\nЗдесь будет текст вашей оферты. Вы можете редактировать его в панели администратора.' },
+    { key: 'legal_info', value: '# Юридическая информация\n\nЗдесь будет информация о юридическом лице.' },
+    { key: 'contacts', value: '# Контактная информация\n\nEmail: support@example.com\nТелефон: +7 (900) 000-00-00' },
+    { key: 'order_rules', value: '# Правила оформления заказа\n\nОписание процесса оформления заказа.' },
+    { key: 'payment_terms', value: '# Условия оплаты\n\nИнформация о способах и условиях оплаты.' },
+    { key: 'delivery_terms', value: '# Условия доставки\n\nИнформация о способах и сроках доставки.' },
+    { key: 'refund_policy', value: '# Политика возврата\n\nУсловия возврата товаров и денежных средств.' },
+    { key: 'requisites', value: '# Реквизиты самозанятого/ИП/ЮЛ\n\nПолные реквизиты организации.' },
+    { key: 'privacy_policy', value: '# Политика обработки персональных данных\n\nТекст политики конфиденциальности.' }
+  ];
+
+  for (const item of keys) {
+    const existing = db.prepare("SELECT * FROM global_settings WHERE key = ?").get(item.key);
+    if (!existing) {
+      db.prepare("INSERT INTO global_settings (key, value) VALUES (?, ?)").run(item.key, item.value);
+    }
   }
-} catch (e) {}
+} catch (e) {
+  console.error("Migration/Initialization error for global_settings:", e);
+}
 
 try {
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_product ON price_lists(supplier_id, product_id)");
@@ -228,11 +244,13 @@ defaultTemplates.forEach(t => {
   db.prepare("INSERT OR IGNORE INTO email_templates (id, subject, body, description) VALUES (?, ?, ?, ?)").run(t.id, t.subject, t.body, t.description);
 });
 
-
 // Helper to get system settings
 function getSystemSettings() {
   const settings = db.prepare("SELECT * FROM system_settings WHERE id = 1").get() as any;
-  const publicOffer = db.prepare("SELECT value FROM global_settings WHERE key = 'public_offer'").get() as any;
+  const globalRecords = db.prepare("SELECT * FROM global_settings").all() as any[];
+  
+  const global: Record<string, string> = {};
+  globalRecords.forEach(r => global[r.key] = r.value);
   
   return {
     robokassa_login: settings?.robokassa_login || process.env.ROBOKASSA_LOGIN || "test_merchant",
@@ -251,7 +269,7 @@ function getSystemSettings() {
     session_secret: settings?.session_secret || process.env.SESSION_SECRET || "secret-key",
     gemini_api_key: settings?.gemini_api_key || process.env.GEMINI_API_KEY || "",
     smtp_from: settings?.smtp_from || process.env.SMTP_FROM || "no-reply@restcost.ru",
-    public_offer: publicOffer?.value || ""
+    ...global
   };
 }
 
@@ -404,6 +422,22 @@ function generateRobokassaUrl(invId: number, outSum: number, description: string
 async function startServer() {
   const app = express();
   app.set('trust proxy', 1);
+
+  // HTTPS Redirect Middleware
+  app.use((req, res, next) => {
+    const host = req.headers.host || '';
+    const xForwardedProto = req.headers['x-forwarded-proto'];
+    
+    // Перенаправляем на https только если мы не на localhost и не в превью AI Studio
+    if (xForwardedProto === 'http' && 
+        !host.includes('localhost') && 
+        !host.includes('127.0.0.1') && 
+        !host.includes('.run.app') && 
+        !host.includes('googleusercontent.com')) {
+      return res.redirect(301, `https://${host}${req.url}`);
+    }
+    next();
+  });
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -1333,7 +1367,7 @@ async function startServer() {
       robokassa_login, robokassa_pass1, robokassa_pass2, robokassa_test, 
       datanewton_api_key, smtp_host, smtp_port, smtp_user, smtp_pass, base_url,
       google_client_id, google_client_secret, google_redirect_uri, session_secret, gemini_api_key,
-      smtp_from, public_offer
+      smtp_from, ...globalKeys
     } = req.body;
 
     try {
@@ -1376,14 +1410,32 @@ async function startServer() {
         smtp_from
       );
 
-      if (public_offer !== undefined) {
-        db.prepare("INSERT OR REPLACE INTO global_settings (key, value) VALUES (?, ?)").run('public_offer', public_offer);
+      // Handle global settings
+      const globalSettingKeys = [
+        'public_offer', 'legal_info', 'contacts', 'order_rules', 
+        'payment_terms', 'delivery_terms', 'refund_policy', 'requisites', 'privacy_policy'
+      ];
+
+      for (const key of globalSettingKeys) {
+        if (globalKeys[key] !== undefined) {
+          db.prepare("INSERT INTO global_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, globalKeys[key]);
+        }
       }
 
       res.json({ success: true });
     } catch (err) {
       console.error("Update settings error:", err);
       res.status(500).json({ error: "Failed to update settings" });
+    }
+  });
+
+  app.get("/api/settings/:key", (req, res) => {
+    const { key } = req.params;
+    const setting = db.prepare("SELECT value FROM global_settings WHERE key = ?").get(key) as any;
+    if (setting) {
+      res.json({ value: setting.value });
+    } else {
+      res.status(404).json({ error: "Setting not found" });
     }
   });
 

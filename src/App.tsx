@@ -45,7 +45,9 @@ import {
   EyeOff,
   MapPin,
   Tag,
-  Shield
+  Shield,
+  ShieldCheck,
+  FileClock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -2581,22 +2583,34 @@ const SupplierProfileView = ({ supplierId, onBack, onAddToCart, onWriteMessage }
   );
 };
 
-const PublicOfferModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+const LegalModal = ({ isOpen, onClose, docKey = 'public_offer' }: { isOpen: boolean, onClose: () => void, docKey?: string }) => {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+
+  const titles: Record<string, string> = {
+    'public_offer': 'Публичная оферта',
+    'legal_info': 'Юридическая информация',
+    'contacts': 'Контактная информация',
+    'order_rules': 'Правила оформления заказа',
+    'payment_terms': 'Условия оплаты',
+    'delivery_terms': 'Условия доставки',
+    'refund_policy': 'Политика возврата',
+    'requisites': 'Реквизиты',
+    'privacy_policy': 'Политика конфиденциальности'
+  };
 
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
-      fetch('/api/settings/public_offer')
+      fetch(`/api/settings/${docKey}`)
         .then(res => res.json())
         .then(data => {
-          setContent(data.value);
+          setContent(data.value || '');
           setLoading(false);
         })
         .catch(() => setLoading(false));
     }
-  }, [isOpen]);
+  }, [isOpen, docKey]);
 
   return (
     <AnimatePresence>
@@ -2613,17 +2627,17 @@ const PublicOfferModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl max-h-[80vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+            className="relative w-full max-w-4xl max-h-[85vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col"
           >
             <div className="p-6 border-b border-zinc-100 flex justify-between items-center bg-white sticky top-0 z-10">
-              <h2 className="text-xl font-bold text-zinc-900">Публичная оферта</h2>
+              <h2 className="text-xl font-bold text-zinc-900">{titles[docKey] || 'Документ'}</h2>
               <button onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-xl transition-colors text-zinc-400 hover:text-zinc-900">
                 <X size={24} />
               </button>
             </div>
             <div className="p-8 overflow-y-auto prose prose-zinc max-w-none prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-p:text-zinc-600 prose-strong:text-zinc-900 prose-a:text-emerald-600 hover:prose-a:text-emerald-700">
               {loading ? (
-                <div className="py-20 text-center text-zinc-400">Загрузка текста оферты...</div>
+                <div className="py-20 text-center text-zinc-400">Загрузка документа...</div>
               ) : (
                 <ReactMarkdown 
                   remarkPlugins={[remarkBreaks, remarkGfm]} 
@@ -3307,7 +3321,7 @@ const SystemSettingsView = () => {
   const [templates, setTemplates] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'payments' | 'api' | 'email' | 'logs' | 'offer'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'payments' | 'api' | 'email' | 'logs' | 'legal'>('general');
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -3500,8 +3514,8 @@ const SystemSettingsView = () => {
             { id: 'payments', label: 'Оплата', icon: CreditCard },
             { id: 'api', label: 'API Ключи', icon: Zap },
             { id: 'email', label: 'Email', icon: Mail },
-            { id: 'offer', label: 'Оферта', icon: FileText },
-            { id: 'logs', label: 'Логи Email', icon: FileText }
+            { id: 'legal', label: 'Юр. док-ты', icon: ShieldCheck },
+            { id: 'logs', label: 'Логи Email', icon: FileClock }
           ].map(tab => (
             <button
               key={tab.id}
@@ -3904,7 +3918,7 @@ const SystemSettingsView = () => {
             </motion.div>
           )}
 
-          {activeTab === 'offer' && (
+          {activeTab === 'legal' && (
             <motion.div 
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -3912,18 +3926,81 @@ const SystemSettingsView = () => {
             >
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-                  <FileText size={20} className="text-amber-500" />
-                  Публичная оферта
+                  <ShieldCheck size={20} className="text-emerald-500" />
+                  Юридические документы (Robokassa)
                 </h3>
-                <p className="text-sm text-zinc-500">Текст оферты в формате Markdown. Он будет отображаться пользователям по ссылке в футере.</p>
-                <div className="space-y-1.5">
-                  <textarea 
-                    value={settings.public_offer || ''}
-                    onChange={e => setSettings({...settings, public_offer: e.target.value})}
-                    rows={15}
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-sm"
-                    placeholder="# Заголовок\n\nТекст оферты..."
-                  />
+                <p className="text-sm text-zinc-500">
+                  Здесь вы можете отредактировать юридические тексты, необходимые для интеграции Robokassa.
+                  Используйте формат Markdown для оформления.
+                </p>
+
+                <div className="space-y-6">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Публичная оферта</label>
+                    <textarea 
+                      value={settings.public_offer || ''}
+                      onChange={e => setSettings({...settings, public_offer: e.target.value})}
+                      className="w-full h-40 px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-xs"
+                      placeholder="# Публичная оферта..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Реквизиты</label>
+                      <textarea 
+                        value={settings.requisites || ''}
+                        onChange={e => setSettings({...settings, requisites: e.target.value})}
+                        className="w-full h-32 px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-xs"
+                        placeholder="ИНН, Расчетный счет..."
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Контакты</label>
+                      <textarea 
+                        value={settings.contacts || ''}
+                        onChange={e => setSettings({...settings, contacts: e.target.value})}
+                        className="w-full h-32 px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-xs"
+                        placeholder="Email, Телефон..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Правила заказа и Оплата</label>
+                    <textarea 
+                      value={settings.order_rules || ''}
+                      onChange={e => setSettings({...settings, order_rules: e.target.value})}
+                      className="w-full h-32 px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Доставка и услуги</label>
+                    <textarea 
+                      value={settings.delivery_terms || ''}
+                      onChange={e => setSettings({...settings, delivery_terms: e.target.value})}
+                      className="w-full h-32 px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Возврат и отмена</label>
+                    <textarea 
+                      value={settings.refund_policy || ''}
+                      onChange={e => setSettings({...settings, refund_policy: e.target.value})}
+                      className="w-full h-32 px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Политика конфиденциальности</label>
+                    <textarea 
+                      value={settings.privacy_policy || ''}
+                      onChange={e => setSettings({...settings, privacy_policy: e.target.value})}
+                      className="w-full h-32 px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-xs"
+                    />
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -5797,7 +5874,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const [isOfferOpen, setIsOfferOpen] = useState(false);
+  const [legalModal, setLegalModal] = useState<{ isOpen: boolean, key: string }>({ isOpen: false, key: 'public_offer' });
   const [requestedTab, setRequestedTab] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -5911,33 +5988,62 @@ export default function App() {
         user={user}
       />
 
-      <PublicOfferModal 
-        isOpen={isOfferOpen}
-        onClose={() => setIsOfferOpen(false)}
+      <LegalModal 
+        isOpen={legalModal.isOpen}
+        docKey={legalModal.key}
+        onClose={() => setLegalModal({ ...legalModal, isOpen: false })}
       />
 
       {/* Footer */}
-      <footer className="border-t border-zinc-100 py-12 bg-zinc-50">
+      <footer className="border-t border-zinc-100 py-16 bg-zinc-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-emerald-600 rounded flex items-center justify-center text-white font-bold text-xs">
-                <Package size={14} />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+            <div className="col-span-1 md:col-span-1">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="w-8 h-8 bg-emerald-600 rounded flex items-center justify-center text-white font-bold text-sm">
+                  <Package size={20} />
+                </div>
+                <span className="font-bold tracking-tight text-xl text-zinc-900">RestCost</span>
               </div>
-              <span className="font-bold tracking-tight text-zinc-900">Агрегатор</span>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Интеллектуальный помощник для управления закупками в ресторанном бизнесе. Экономим до 20% ваших расходов.
+              </p>
             </div>
-            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm text-zinc-500 font-medium">
-              <button 
-                onClick={() => setIsOfferOpen(true)} 
-                className="hover:text-zinc-900 transition-colors py-1"
-              >
-                Публичная оферта
-              </button>
-              <a href="#" className="hover:text-zinc-900 transition-colors py-1">О сервисе</a>
-              <a href="#" className="hover:text-zinc-900 transition-colors py-1">Тарифы</a>
-              <a href="#" className="hover:text-zinc-900 transition-colors py-1">Помощь</a>
+            
+            <div className="col-span-1">
+              <h4 className="font-bold text-zinc-900 mb-6">Сервис</h4>
+              <ul className="space-y-4 text-sm text-zinc-500">
+                <li><a href="#" className="hover:text-emerald-600 transition-colors">О проекте</a></li>
+                <li><a href="#" className="hover:text-emerald-600 transition-colors">Тарифы</a></li>
+                <li><button onClick={() => setIsFeedbackOpen(true)} className="hover:text-emerald-600 transition-colors">Поддержка</button></li>
+              </ul>
             </div>
-            <p className="text-xs text-zinc-400">© 2026 Агрегатор HoReCa. Все права защищены.</p>
+
+            <div className="col-span-1">
+              <h4 className="font-bold text-zinc-900 mb-6">Правовая информация</h4>
+              <ul className="space-y-4 text-sm text-zinc-500">
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'public_offer' })} className="hover:text-emerald-600 transition-colors text-left">Публичная оферта</button></li>
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'privacy_policy' })} className="hover:text-emerald-600 transition-colors text-left">Конфиденциальность</button></li>
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'order_rules' })} className="hover:text-emerald-600 transition-colors text-left">Оплата и заказ</button></li>
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'refund_policy' })} className="hover:text-emerald-600 transition-colors text-left">Возврат и отмена</button></li>
+              </ul>
+            </div>
+
+            <div className="col-span-1">
+              <h4 className="font-bold text-zinc-900 mb-6">Помощь</h4>
+              <ul className="space-y-4 text-sm text-zinc-500">
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'contacts' })} className="hover:text-emerald-600 transition-colors text-left">Контакты</button></li>
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'requisites' })} className="hover:text-emerald-600 transition-colors text-left">Реквизиты</button></li>
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'delivery_terms' })} className="hover:text-emerald-600 transition-colors text-left">Доставка</button></li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="pt-8 border-t border-zinc-200 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-zinc-400">© 2026 RestCost App. Интеллектуальные закупки HoReCa. Все права защищены.</p>
+            <div className="flex items-center gap-6">
+              <img src="https://robokassa.com/local/templates/robokassa/images/logo.svg" alt="Robokassa" className="h-6 grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all cursor-pointer" />
+            </div>
           </div>
         </div>
       </footer>
