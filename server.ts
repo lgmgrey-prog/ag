@@ -2032,11 +2032,40 @@ async function startServer() {
       }
     });
   } else {
+    const distPath = path.resolve(__dirname, "dist");
+    const indexPath = path.join(distPath, "index.html");
+    
     console.log("Starting in PRODUCTION mode");
-    const distPath = path.join(__dirname, "dist");
-    app.use(express.static(distPath));
+    console.log(`[DEBUG] Static files path: ${distPath}`);
+    console.log(`[DEBUG] Index HTML path: ${indexPath}`);
+
+    if (!fs.existsSync(distPath)) {
+      console.error(`[ERROR] Directory not found: ${distPath}. Did you run 'npm run build'?`);
+    }
+    if (!fs.existsSync(indexPath)) {
+      console.error(`[ERROR] index.html not found at: ${indexPath}`);
+    }
+
+    app.use(express.static(distPath, {
+      index: false // We handle index.html via the catch-all route to support SPA
+    }));
+
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      // Check if file exists before sending, otherwise return a clear error
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send(`
+          <html>
+            <head><title>Configuration Error</title></head>
+            <body>
+              <h1>RestCost Server Error</h1>
+              <p>The build directory or index.html was not found. Please ensure you have run <code>npm run build</code>.</p>
+              <p>Searching at: <code>${indexPath}</code></p>
+            </body>
+          </html>
+        `);
+      }
     });
   }
 
