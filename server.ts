@@ -3,6 +3,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import axios from "axios";
@@ -15,7 +16,7 @@ import { GoogleGenAI } from "@google/genai";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = new Database("procurehub.db");
+const db = new Database("database.sqlite");
 db.exec("PRAGMA foreign_keys = ON;");
 
 // Initialize database
@@ -422,6 +423,21 @@ function generateRobokassaUrl(invId: number, outSum: number, description: string
 async function startServer() {
   const app = express();
   app.set('trust proxy', 1);
+
+  // Request logger for debugging
+  app.use((req, res, next) => {
+    console.log(`[DEBUG] ${req.method} ${req.url}`);
+    next();
+  });
+
+  app.get("/api/debug", (req, res) => {
+    res.json({ 
+      status: "running", 
+      env: process.env.NODE_ENV,
+      cwd: process.cwd(),
+      dirname: __dirname
+    });
+  });
 
   // HTTPS Redirect Middleware
   app.use((req, res, next) => {
@@ -2003,11 +2019,24 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
+    
+    // Explicit fallback for index.html in dev mode if vite middleware misses it
+    app.get("*", async (req, res, next) => {
+      if (req.url.startsWith('/api')) return next();
+      try {
+        const html = await fs.readFileSync(path.join(__dirname, "index.html"), "utf-8");
+        const transformedHtml = await vite.transformIndexHtml(req.url, html);
+        res.status(200).set({ "Content-Type": "text/html" }).end(transformedHtml);
+      } catch (e) {
+        next(e);
+      }
+    });
   } else {
     console.log("Starting in PRODUCTION mode");
-    app.use(express.static(path.join(__dirname, "dist")));
+    const distPath = path.join(__dirname, "dist");
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
