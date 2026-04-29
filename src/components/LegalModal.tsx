@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import rehypeRaw from 'rehype-raw';
 
 interface LegalModalProps {
   isOpen: boolean;
@@ -69,11 +70,21 @@ const LegalModal = ({ isOpen, onClose, docKey = 'public_offer' }: LegalModalProp
                 <div className="py-20 text-center text-zinc-400">Загрузка документа...</div>
               ) : (
                 <ReactMarkdown 
-                  remarkPlugins={[remarkBreaks, remarkGfm]} 
+                  remarkPlugins={[remarkBreaks, remarkGfm]}
+                  rehypePlugins={[rehypeRaw]}
                 >
-                  {content}
+                  {content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')}
                 </ReactMarkdown>
               )}
+            </div>
+            
+            <div className="p-6 border-t border-zinc-100 bg-zinc-50 flex justify-end">
+              <button 
+                onClick={onClose}
+                className="px-8 py-3 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200"
+              >
+                Закрыть
+              </button>
             </div>
           </motion.div>
         </div>

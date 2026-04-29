@@ -50,10 +50,6 @@ import {
   FileClock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import ReactMarkdown from 'react-markdown';
-import remarkBreaks from 'remark-breaks';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
 import { analyzePrices, recognizeInvoice } from './services/geminiService';
 import { SupplierImport } from './components/SupplierImport';
