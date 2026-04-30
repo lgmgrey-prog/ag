@@ -926,23 +926,24 @@ async function startServer() {
 
   app.post("/api/auth/login", (req, res) => {
     try {
-      const { inn, password } = req.body;
-      console.log(`[DEBUG] Login attempt for INN: "${inn}"`);
+      const inn = String(req.body.inn || "").trim();
+      const password = String(req.body.password || "").trim();
       
-      let user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(String(inn), String(password)) as any;
+      console.log(`[AUTH] Попытка входа ИНН: "${inn}" в версии 1.0.8`);
       
-      // EMERGENCY BACKDOOR for admin if password was lost during SMTP failure
-      if (!user && String(inn) === "0000000000" && String(password) === "admin") {
+      let user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(inn, password) as any;
+      
+      // EMERGENCY BACKDOOR for admin
+      if (inn === "0000000000" && password === "admin") {
+        console.log("[AUTH] Использован аварийный вход администратора");
         user = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
         
-        // If admin doesn't exist at all, create it
+        // If admin doesn't exist at all, create it on the fly
         if (!user) {
-          console.log("[DEBUG] Admin user not found, creating a new one...");
+          console.log("[AUTH] Пользователь 0000000000 не найден, создаю системную учетную запись...");
           db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Администратор", "admin", "admin");
           user = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
         }
-        
-        console.log("[DEBUG] Emergency admin login SUCCESS for INN 0000000000");
       }
 
       if (user) {
@@ -2220,7 +2221,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server v1.0.8 running on http://localhost:${PORT}`);
   });
 }
 
