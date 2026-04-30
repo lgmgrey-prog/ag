@@ -6094,7 +6094,7 @@ export default function App() {
           <div className="pt-8 border-t border-zinc-200 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col gap-1">
               <p className="text-xs text-zinc-400">© 2026 RestCost App. Интеллектуальные закупки HoReCa. Все права защищены.</p>
-              <p className="text-[10px] text-zinc-300">Версия сборки: 2.1.0</p>
+              <p className="text-[10px] text-zinc-300">Версия сборки: 2.2.0</p>
             </div>
             <div className="flex items-center gap-6">
               <img src="https://robokassa.com/local/templates/robokassa/images/logo.svg" alt="Robokassa" className="h-6 grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all cursor-pointer" />
