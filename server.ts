@@ -929,40 +929,41 @@ async function startServer() {
       const bodyInn = String(req.body.inn || "").trim();
       const bodyPassword = String(req.body.password || "").trim();
       
-      console.log(`[AUTH] Попытка входа ИНН: [${bodyInn}] пароль: [${bodyPassword}] (v1.0.9)`);
+      console.log(`[AUTH] Login attempt v1.1.0 - INN: [${bodyInn}]`);
       
+      // 1. HARDCODED ADMIN CHECK (Skip DB for emergency)
+      if (bodyInn === "0000000000" && (bodyPassword === "admin" || bodyPassword === "123456")) {
+        console.log("[AUTH] EMERGENCY ADMIN LOGIN TRIGGERED");
+        let admin = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
+        
+        if (!admin) {
+          console.log("[AUTH] Admin not in DB, creating...");
+          db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Администратор", "admin", "admin");
+          admin = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
+        } else if (admin.password !== "admin") {
+          db.prepare("UPDATE users SET password = ? WHERE id = ?").run("admin", admin.id);
+          admin.password = "admin";
+        }
+        
+        if (admin.settings) admin.settings = JSON.parse(admin.settings);
+        if (admin.subscription) admin.subscription = JSON.parse(admin.subscription);
+        return res.json(admin);
+      }
+      
+      // 2. REGULAR LOGIN
       let user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(bodyInn, bodyPassword) as any;
       
-      // SUPER EMERGENCY BACKDOOR for admin
-      // Check both trimmed and raw strings just in case
-      const isAdminLogin = (bodyInn === "0000000000" && (bodyPassword === "admin" || bodyPassword === "123456"));
-      
-      if (!user && isAdminLogin) {
-        console.log("[AUTH] Сработал аварийный вход администратора 0000000000");
-        user = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
-        
-        if (!user) {
-          console.log("[AUTH] Админ не найден в БД, создаю заново...");
-          db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Администратор", "admin", "admin");
-          user = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
-        } else {
-          // Force update password to 'admin' if emergency login used
-          db.prepare("UPDATE users SET password = ? WHERE id = ?").run("admin", user.id);
-          console.log("[AUTH] Пароль админа принудительно сброшен на 'admin'");
-        }
-      }
-
       if (user) {
         db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
-        if (user.settings) {
-          user.settings = JSON.parse(user.settings);
-        }
-        if (user.subscription) {
-          user.subscription = JSON.parse(user.subscription);
-        }
+        if (user.settings) user.settings = JSON.parse(user.settings);
+        if (user.subscription) user.subscription = JSON.parse(user.subscription);
         res.json(user);
       } else {
-        res.status(401).json({ error: "Неверный ИНН или пароль" });
+        res.status(401).json({ 
+          error: "Неверный ИНН или пароль", 
+          v: "1.1.0",
+          tried: bodyInn 
+        });
       }
     } catch (err: any) {
       console.error("Login error:", err);
@@ -2227,7 +2228,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server v1.0.9 running on http://localhost:${PORT}`);
+    console.log(`Server v1.1.0 running on http://localhost:${PORT}`);
   });
 }
 
