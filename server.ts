@@ -472,7 +472,8 @@ async function startServer() {
         !host.includes('127.0.0.1') && 
         !host.includes('.run.app') && 
         !host.includes('googleusercontent.com')) {
-      return res.redirect(301, `https://${host}${req.url}`);
+      console.log(`[DEBUG] Redirecting to HTTPS: ${host}${req.url} (Method: ${req.method})`);
+      return res.redirect(308, `https://${host}${req.url}`);
     }
     next();
   });
@@ -1570,13 +1571,16 @@ async function startServer() {
   });
 
   app.post("/api/admin/settings/test-email", async (req, res) => {
+    console.log("[DEBUG] Received test-email request:", req.body.test_recipient);
     const { smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from, test_recipient } = req.body;
     
     if (!smtp_user || !smtp_pass || !smtp_host || !smtp_port || !test_recipient) {
+      console.log("[DEBUG] Missing SMTP fields");
       return res.status(400).json({ error: "Все поля SMTP и адрес получателя обязательны для теста" });
     }
 
     try {
+      console.log(`[DEBUG] Attempting SMTP test to ${test_recipient} via ${smtp_host}:${smtp_port}`);
       const transporter = nodemailer.createTransport({
         host: smtp_host,
         port: parseInt(smtp_port),
@@ -1585,6 +1589,10 @@ async function startServer() {
           user: smtp_user,
           pass: smtp_pass,
         },
+        // Add a timeout to prevent hanging
+        connectionTimeout: 10000,
+        greetingTimeout: 5000,
+        socketTimeout: 15000
       });
 
       const fromEmail = smtp_from || smtp_user;

@@ -3335,16 +3335,28 @@ const SystemSettingsView = () => {
           test_recipient: testRecipient
         })
       });
-      const data = await res.json();
-      if (res.ok) {
-        setTestEmailResult({ text: data.message, type: 'success' });
+      
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (res.ok) {
+          setTestEmailResult({ text: data.message || 'Успешно!', type: 'success' });
+        } else {
+          setTestEmailResult({ 
+            text: (data.error || 'Ошибка сервера') + (data.details ? ': ' + data.details : ''), 
+            type: 'error' 
+          });
+        }
       } else {
+        const text = await res.text();
+        console.error("Non-JSON response from server:", text);
         setTestEmailResult({ 
-          text: data.error + (data.details ? ': ' + data.details : ''), 
+          text: `Ошибка сервера (${res.status})`, 
+          details: `Сервер вернул не JSON ответ (вероятно HTML). Проверьте настройки HTTPS и URL сервера. Содержимое: ${text.substring(0, 100)}...`,
           type: 'error' 
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       setTestEmailResult({ text: 'Ошибка сети при отправке теста', type: 'error' });
     } finally {
       setIsTestingEmail(false);
