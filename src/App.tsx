@@ -141,8 +141,8 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
           </div>
           
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-600">
-            <a href="#" className="hover:text-emerald-600 transition-colors">Акции</a>
-            <a href="#" className="hover:text-emerald-600 transition-colors">Поставщики</a>
+            <a href="#promotions" className="hover:text-emerald-600 transition-colors">Акции</a>
+            <a href="#suppliers" className="hover:text-emerald-600 transition-colors">Поставщики</a>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
@@ -592,8 +592,73 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
       </div>
     </section>
 
+    {/* Promotions Section */}
+    <section id="promotions" className="py-24 bg-white overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-12">
+          <div>
+            <div className="inline-block px-4 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4">
+              Горячие предложения
+            </div>
+            <h2 className="text-4xl font-bold text-zinc-900 tracking-tight">Актуальные акции</h2>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => {
+                const el = document.getElementById('promo-slider');
+                if (el) el.scrollBy({ left: -350, behavior: 'smooth' });
+              }}
+              className="w-12 h-12 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-zinc-900 hover:border-zinc-900 transition-all active:scale-95"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <button 
+              onClick={() => {
+                const el = document.getElementById('promo-slider');
+                if (el) el.scrollBy({ left: 350, behavior: 'smooth' });
+              }}
+              className="w-12 h-12 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-zinc-900 hover:border-zinc-900 transition-all active:scale-95"
+            >
+              <ChevronRight size={24} />
+            </button>
+          </div>
+        </div>
+
+        <div id="promo-slider" className="flex gap-6 overflow-x-auto pb-8 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory">
+          {[
+            { supplier: 'Global Foods', title: 'Скидка на морепродукты', desc: 'При заказе от 50 000 ₽ скидка 10% на весь ассортимент креветок и мидий.', color: 'from-emerald-500 to-teal-400' },
+            { supplier: 'Мясной Мир', title: 'Бонус за говядину', desc: 'Закажите 100кг вырезки и получите 5кг в подарок. Только до конца недели!', color: 'from-emerald-500 to-teal-500' },
+            { supplier: 'Вег-Маркет', title: 'Тропический микс', desc: 'Спелые манго и ананасы по оптовым ценам напрямую из Эквадора.', color: 'from-emerald-600 to-teal-400' },
+            { supplier: 'Молочный Край', title: 'Сырная неделя', desc: 'Пармезан и Моцарелла со скидкой 15%. Идеально для пиццерий.', color: 'from-emerald-500 to-emerald-400' }
+          ].map((promo, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              viewport={{ once: true }}
+              className="min-w-[300px] md:min-w-[380px] bg-white border border-zinc-100 rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-xl transition-all group snap-start"
+            >
+              <div className={`h-32 bg-gradient-to-br ${promo.color} p-8 flex items-end relative overflow-hidden`}>
+                <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">Акция</div>
+                <h3 className="text-white font-bold text-xl relative z-10">{promo.supplier}</h3>
+                <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+              </div>
+              <div className="p-8">
+                <h4 className="font-bold text-zinc-900 text-lg mb-3">{promo.title}</h4>
+                <p className="text-zinc-500 text-sm leading-relaxed mb-6 h-12 line-clamp-2">{promo.desc}</p>
+                <button className="flex items-center gap-2 text-sm font-bold text-emerald-600 group-hover:gap-3 transition-all">
+                  Подробнее <ArrowRight size={16} />
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+
     {/* About & Mission Section - Redesigned for elegance */}
-    <section className="py-32 bg-white overflow-hidden relative">
+    <section id="about" className="py-32 bg-white overflow-hidden relative">
       {/* Subtle background pattern */}
       <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none">
         <div className="absolute top-0 left-0 w-full h-full" style={{ backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
@@ -733,7 +798,7 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
     </section>
 
     {/* Pricing */}
-    <section className="py-32 bg-zinc-50 overflow-hidden relative">
+    <section id="pricing" className="py-32 bg-zinc-50 overflow-hidden relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-20">
           <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight text-zinc-900">Простые тарифы для роста</h2>
@@ -798,6 +863,63 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
       
       {/* Background glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-500/5 rounded-full blur-[120px] -z-0" />
+    </section>
+
+    {/* Suppliers Section */}
+    <section id="suppliers" className="py-32 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="order-2 lg:order-1">
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { name: 'Global Foods', category: 'Морепродукты и деликатесы' },
+                { name: 'Мясной Мир', category: 'Мясная продукция' },
+                { name: 'Вег-Маркет', category: 'Овощи и фрукты' },
+                { name: 'Молочный Край', category: 'Молочная продукция' }
+              ].map((s, i) => (
+                <div key={i} className="p-6 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-emerald-200 transition-all cursor-default">
+                  <p className="font-bold text-zinc-900 mb-1">{s.name}</p>
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{s.category}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-8 p-6 bg-emerald-600 rounded-3xl text-white">
+              <p className="text-lg font-bold mb-2">Присоединяйтесь к нам</p>
+              <p className="text-white/80 text-sm mb-6">Получите доступ к тысячам ресторанов и увеличьте свои продажи.</p>
+              <button 
+                onClick={onStart}
+                className="bg-white text-emerald-600 px-6 py-3 rounded-xl font-bold text-sm hover:bg-zinc-50 transition-all flex items-center gap-2"
+              >
+                Зарегистрироваться как поставщик <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+          <div className="order-1 lg:order-2">
+            <div className="inline-block px-4 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest mb-6" id="suppliers-target">
+              Поставщикам
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-zinc-900 mb-8 tracking-tight">Станьте частью крупнейшей сети</h2>
+            <p className="text-lg text-zinc-600 mb-8 leading-relaxed">
+              RestCost — это не просто агрегатор, это мост между вашим складом и кухней лучшего ресторана. Мы предоставляем инструменты для прямой коммуникации, автоматического выставления счетов и аналитики спроса.
+            </p>
+            <div className="space-y-4">
+              {[
+                "Прямой чат с шеф-поварами и закупщиками",
+                "Выгрузка прайсов в один клик",
+                "Прозрачная система заказов и оплат",
+                "Аналитика конкурентной среды"
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                    <Check size={14} />
+                  </div>
+                  <span className="text-zinc-700 font-medium">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   </div>
 );
@@ -1866,7 +1988,7 @@ const IntegrationsView = ({ user, onSyncSuccess }: { user: User, onSyncSuccess?:
   );
 };
 
-const CatalogView = ({ user }: { user: User }) => {
+const CatalogView = ({ user, onAddToCart }: { user: User, onAddToCart: (price: PriceRecord) => void }) => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -2113,7 +2235,12 @@ const CatalogView = ({ user }: { user: User }) => {
                                 <div className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded">
                                   -{Math.round(((p.current_price - bestOffer.offer.price) / p.current_price) * 100)}%
                                 </div>
-                                <button className="text-[10px] sm:text-xs font-bold text-emerald-600 hover:underline">Заказать</button>
+                                <button 
+                                  onClick={() => onAddToCart(bestOffer.offer)}
+                                  className="text-[10px] sm:text-xs font-bold text-emerald-600 hover:bg-emerald-50 px-3 py-1 rounded-lg transition-all border border-emerald-100"
+                                >
+                                  В корзину
+                                </button>
                               </div>
                             ) : (
                               <div className="flex items-center gap-2 text-zinc-500 italic text-[11px]">
@@ -2812,7 +2939,9 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
       for (const supplierId in ordersBySupplier) {
         const items = ordersBySupplier[supplierId];
         const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const supplierName = items[0].supplier_name;
         
+        // 1. Create order record
         await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2823,11 +2952,26 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             total
           })
         });
+
+        // 2. Send message to supplier chat
+        const messageContent = `Заявка от "${user.name}":\n\n` + 
+          items.map(item => `• ${item.product_name} (${item.quantity} ${item.unit || 'ед.'}) — ${item.price} ₽`).join('\n') +
+          `\n\nИтого: ${total} ₽`;
+
+        await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sender_id: user.id,
+            receiver_id: parseInt(supplierId),
+            content: messageContent
+          })
+        });
       }
 
-      showToast?.('Заказ успешно оформлен! Поставщики уведомлены.');
+      showToast?.('Заказ успешно оформлен! Заявки отправлены поставщикам в чат.');
       setCart([]);
-      setActiveTab('dashboard');
+      setActiveTab('chat'); // Redirect to chat to see the sent messages
     } catch (err) {
       console.error(err);
       showToast?.('Ошибка при оформлении заказа', 'error');
@@ -3018,12 +3162,24 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                         </div>
                         <button 
                           onClick={() => {
-                            setSearchQuery(rec.product);
-                            document.getElementById('market-prices-section')?.scrollIntoView({ behavior: 'smooth' });
+                            if (rec.supplier_id) {
+                              addToCart({
+                                product_name: rec.product,
+                                supplier_name: rec.supplier,
+                                supplier_id: rec.supplier_id,
+                                price: rec.bestPrice,
+                                category: 'Выгодное предложение',
+                                updated_at: new Date().toISOString()
+                              });
+                            } else {
+                              setSearchQuery(rec.product);
+                              document.getElementById('market-prices-section')?.scrollIntoView({ behavior: 'smooth' });
+                            }
                           }}
-                          className="bg-zinc-100 text-zinc-900 p-2 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"
+                          className="bg-emerald-600 text-white p-2 rounded-xl hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                          title="Добавить в корзину"
                         >
-                          <ArrowRight size={20} />
+                          <ShoppingCart size={20} />
                         </button>
                       </div>
                     </div>
@@ -3217,7 +3373,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
           >
-            <CatalogView user={user} />
+            <CatalogView user={user} onAddToCart={addToCart} />
           </motion.div>
         )}
         {activeTab === 'settings' && (
@@ -3419,6 +3575,20 @@ const SystemSettingsView = () => {
     }
   };
 
+  const clearChats = async () => {
+    if (!confirm('Вы уверены, что хотите очистить все чаты? Это действие удалит все сообщения безвозвратно!')) return;
+    try {
+      const res = await fetch('/api/admin/messages/clear', { method: 'DELETE' });
+      if (res.ok) {
+        setMessage({ text: 'Все чаты успешно очищены', type: 'success' });
+      } else {
+        setMessage({ text: 'Ошибка при очистке чатов', type: 'error' });
+      }
+    } catch (err) {
+      setMessage({ text: 'Ошибка сети', type: 'error' });
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -3531,6 +3701,19 @@ const SystemSettingsView = () => {
                   onToggle={() => toggleSecret('session_secret')}
                 />
                 <p className="text-[10px] text-zinc-400 -mt-3">Используется для подписи кук сессии. Изменение этого ключа приведет к выходу всех пользователей из системы.</p>
+                
+                <div className="pt-6 border-t border-zinc-100">
+                  <h4 className="text-sm font-bold text-red-500 uppercase tracking-wider mb-4">Опасная зона</h4>
+                  <button
+                    type="button"
+                    onClick={clearChats}
+                    className="flex items-center gap-2 px-6 py-3 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-all border border-red-100"
+                  >
+                    <Trash2 size={18} />
+                    Очистить все чаты
+                  </button>
+                  <p className="text-[10px] text-zinc-400 mt-2">Это действие удалит все сообщения из всех чатов. Восстановление невозможно.</p>
+                </div>
               </div>
             </motion.div>
           )}
@@ -6064,8 +6247,8 @@ export default function App() {
             <div className="col-span-1">
               <h4 className="font-bold text-zinc-900 mb-6">Сервис</h4>
               <ul className="space-y-4 text-sm text-zinc-500">
-                <li><a href="#" className="hover:text-emerald-600 transition-colors">О проекте</a></li>
-                <li><a href="#" className="hover:text-emerald-600 transition-colors">Тарифы</a></li>
+                <li><a href="#about" className="hover:text-emerald-600 transition-colors">О проекте</a></li>
+                <li><a href="#pricing" className="hover:text-emerald-600 transition-colors">Тарифы</a></li>
                 <li><button onClick={() => setIsFeedbackOpen(true)} className="hover:text-emerald-600 transition-colors">Поддержка</button></li>
               </ul>
             </div>

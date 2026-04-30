@@ -76,6 +76,7 @@ export async function analyzePrices(matrix: any[], marketPrices: any[]) {
                   currentPrice: { type: Type.NUMBER },
                   bestPrice: { type: Type.NUMBER },
                   supplier: { type: Type.STRING },
+                  supplier_id: { type: Type.NUMBER },
                   savingsPercent: { type: Type.NUMBER }
                 }
               }

@@ -1979,6 +1979,15 @@ async function startServer() {
     }
   });
 
+  app.delete("/api/admin/messages/clear", (req, res) => {
+    try {
+      db.prepare("DELETE FROM messages").run();
+      res.json({ success: true, message: "Все чаты успешно очищены" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // iiko Integration API
   app.post("/api/integrations/iiko/connect", async (req, res) => {
     const { userId, apiLogin: incomingApiLogin } = req.body;

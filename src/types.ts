@@ -28,6 +28,7 @@ export interface Recommendation {
   currentPrice: number;
   bestPrice: number;
   supplier: string;
+  supplier_id?: number;
   savingsPercent: number;
 }
 
