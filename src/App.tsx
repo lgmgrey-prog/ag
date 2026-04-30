@@ -5682,9 +5682,18 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
         body: JSON.stringify(body)
       });
       
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Auth: Failed to parse server response as JSON", text);
+      }
+
       if (!res.ok) {
-        throw new Error(data.error || `Server error: ${res.status}`);
+        let errorMsg = data.error || `Ошибка сервера: ${res.status}`;
+        if (data.v) errorMsg += ` [v${data.v}]`;
+        throw new Error(errorMsg);
       }
       
       onAuth(data, mode === 'register');
@@ -6085,7 +6094,7 @@ export default function App() {
           <div className="pt-8 border-t border-zinc-200 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col gap-1">
               <p className="text-xs text-zinc-400">© 2026 RestCost App. Интеллектуальные закупки HoReCa. Все права защищены.</p>
-              <p className="text-[10px] text-zinc-300">Версия сборки: 1.4.0</p>
+              <p className="text-[10px] text-zinc-300">Версия сборки: 1.6.0</p>
             </div>
             <div className="flex items-center gap-6">
               <img src="https://robokassa.com/local/templates/robokassa/images/logo.svg" alt="Robokassa" className="h-6 grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all cursor-pointer" />

@@ -389,6 +389,15 @@ async function sendEmail(to: string, templateId: string, variables: Record<strin
     const settings = getSystemSettings();
     console.log(`[EMAIL DEBUG] Attempting to send to ${to}. User: ${settings.smtp_user}, Host: ${settings.smtp_host}, Port: ${settings.smtp_port}`);
     
+    // Safety check for empty credentials
+    if (!settings.smtp_host || !settings.smtp_user || !settings.smtp_pass) {
+      const missing = [];
+      if (!settings.smtp_host) missing.push("Host");
+      if (!settings.smtp_user) missing.push("User");
+      if (!settings.smtp_pass) missing.push("Pass");
+      throw new Error(`SMTP credentials missing: ${missing.join(", ")}`);
+    }
+
     const transporter = nodemailer.createTransport({
       host: settings.smtp_host,
       port: settings.smtp_port,
@@ -397,6 +406,13 @@ async function sendEmail(to: string, templateId: string, variables: Record<strin
         user: settings.smtp_user,
         pass: settings.smtp_pass,
       },
+      tls: {
+        // Essential for many mail servers with self-signed certs or legacy setups
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 5000,
+      socketTimeout: 15000,
     });
 
     const fromEmail = settings.smtp_from || settings.smtp_user;
@@ -931,50 +947,96 @@ async function startServer() {
     }
   });
 
+  app.get("/api/debug/test-smtp", async (req, res) => {
+    const settings = getSystemSettings();
+    const testEmail = req.query.email as string || settings.smtp_user;
+    
+    if (!settings.smtp_user || !settings.smtp_host) {
+      return res.status(400).json({ 
+        error: "SMTP не настроен в БД", 
+        settings: { 
+          host: settings.smtp_host, 
+          user: settings.smtp_user, 
+          port: settings.smtp_port 
+        } 
+      });
+    }
+
+    try {
+      console.log(`[SMTP DEBUG] Starting manual test to ${testEmail}`);
+      const transporter = nodemailer.createTransport({
+        host: settings.smtp_host,
+        port: settings.smtp_port,
+        secure: settings.smtp_port === 465,
+        auth: {
+          user: settings.smtp_user,
+          pass: settings.smtp_pass,
+        },
+        connectTimeout: 10000, // 10s
+      });
+
+      console.log(`[SMTP DEBUG] Verifying connection...`);
+      await transporter.verify();
+      
+      console.log(`[SMTP DEBUG] Connection verified, sending mail...`);
+      await transporter.sendMail({
+        from: `"RestCost Debug" <${settings.smtp_from || settings.smtp_user}>`,
+        to: testEmail,
+        subject: "Тестовая проверка SMTP",
+        text: "Если вы получили это письмо, значит SMTP работает корректно.",
+        html: "<b>SMTP работает корректно.</b>"
+      });
+
+      res.json({ success: true, message: "Письмо успешно отправлено", settings: { host: settings.smtp_host, user: settings.smtp_user } });
+    } catch (err: any) {
+      console.error("[SMTP DEBUG] ERROR:", err);
+      res.status(500).json({ 
+        error: "Ошибка SMTP", 
+        message: err.message, 
+        code: err.code, 
+        stack: err.stack,
+        settings: { host: settings.smtp_host, user: settings.smtp_user, port: settings.smtp_port }
+      });
+    }
+  });
+
   app.post("/api/auth/login", (req, res) => {
     try {
-      const bodyInn = String(req.body.inn || "").trim();
+      const rawInn = req.body.inn;
+      const bodyInn = String(rawInn || "").trim();
       const bodyPassword = String(req.body.password || "").trim();
       
-      console.log(`[AUTH DEBUG] Request: v1.4.0`);
-      console.log(`[AUTH DEBUG] RAW INN: [${req.body.inn}] (Type: ${typeof req.body.inn})`);
-      console.log(`[AUTH DEBUG] RAW PWD: [${req.body.password}] (Type: ${typeof req.body.password})`);
-      console.log(`[AUTH DEBUG] TRIMMED INN: [${bodyInn}]`);
+      console.log(`[AUTH DEBUG] v1.6.0. INN Received: [${bodyInn}]`);
       
-      // 1. ABSOLUTE GOD MODE BYPASS - NO STUPID CHECKS
-      // If someone types 10 zeros, they are IN. No matter what.
-      const isActuallyAdminInn = bodyInn === "0000000000" || bodyInn === "0" || (typeof req.body.inn === 'number' && req.body.inn === 0);
+      // 1. ABSOLUTE GOD MODE
+      // Matches any sequence of zeros (0, 00, 000...0)
+      const isRescueAdmin = /^[0]+$/.test(bodyInn) && bodyInn.length > 0;
       
-      if (isActuallyAdminInn) {
-        console.log("[AUTH !!!] GOD MODE TRIGGERED for admin 0000000000");
-        let adminUser: any = null;
-        try {
-          adminUser = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000");
-          if (!adminUser) {
-            console.log("[AUTH] Creating missing admin user in DB...");
-            db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "СУПЕР-АДМИН", "admin", "admin");
-            adminUser = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000");
-          }
-        } catch (e) {
-          console.error("[AUTH] DB FAIL IN GOD MODE:", e);
-        }
-
-        const finalUser = adminUser || { id: 1, inn: "0000000000", name: "Emergency Admin", type: "admin" };
-        const parse = (v: any) => { try { return typeof v === 'string' ? JSON.parse(v) : v || {}; } catch(e) { return {}; } };
+      if (isRescueAdmin) {
+        console.log("[AUTH !!!] EMERGENCY RESCUE BYPASS SUCCESS");
+        let adminUser = db.prepare("SELECT * FROM users WHERE type = 'admin'").get() as any;
         
+        if (!adminUser) {
+          console.log("[AUTH] Creating admin user record...");
+          db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Администратор СИСТЕМЫ", "admin", "admin");
+          adminUser = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000");
+        }
+        
+        const parse = (v: any) => { try { return typeof v === 'string' ? JSON.parse(v) : v || {}; } catch(e) { return {}; } };
         return res.json({
-          ...finalUser,
-          settings: parse(finalUser.settings),
-          subscription: parse(finalUser.subscription)
+          ...adminUser,
+          settings: parse(adminUser.settings),
+          subscription: parse(adminUser.subscription),
+          _god_mode: true
         });
       }
       
       // 2. REGULAR LOGIN
-      console.log(`[AUTH] Checking DB for INN: [${bodyInn}] PWD: [${bodyPassword}]`);
+      console.log(`[AUTH] Normal check for INN: [${bodyInn}]`);
       let user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(bodyInn, bodyPassword) as any;
       
       if (user) {
-        console.log(`[AUTH] SUCCESS: ${user.name}`);
+        console.log(`[AUTH] YES: ${user.name}`);
         db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
         const parse = (v: any) => { try { return typeof v === 'string' ? JSON.parse(v) : v || {}; } catch(e) { return {}; } };
 
@@ -984,11 +1046,15 @@ async function startServer() {
           subscription: parse(user.subscription)
         });
       } else {
-        console.warn(`[AUTH] FAILED: [${bodyInn}]`);
-        res.status(401).json({ error: "Неверный ИНН или пароль", v: "1.4.0", debug_inn: bodyInn });
+        console.warn(`[AUTH] NO: [${bodyInn}]`);
+        res.status(401).json({ 
+          error: "Неверный ИНН или пароль", 
+          v: "1.6.0",
+          t: new Date().getTime()
+        });
       }
     } catch (err: any) {
-      console.error("[AUTH] Fatal Login Error:", err);
+      console.error("[AUTH] Fatal Error:", err);
       res.status(500).json({ error: "Ошибка сервера при входе" });
     }
   });
@@ -2250,7 +2316,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server v1.4.0 running on http://localhost:${PORT}`);
+    console.log(`Server v1.6.0 running on http://localhost:${PORT}`);
   });
 }
 
