@@ -406,11 +406,11 @@ async function sendEmail(to: string, templateId: string, variables: Record<strin
         user: settings.smtp_user,
         pass: settings.smtp_pass,
       },
+      family: 4, // Force IPv4 to avoid ENETUNREACH issues with IPv6
       tls: {
-        // Essential for many mail servers with self-signed certs or legacy setups
         rejectUnauthorized: false
       },
-      connectionTimeout: 10000, // 10 seconds
+      connectionTimeout: 10000,
       greetingTimeout: 5000,
       socketTimeout: 15000,
     });
@@ -508,8 +508,9 @@ async function startServer() {
           user: settings.smtp_user,
           pass: settings.smtp_pass,
         },
+        // ПРИНУДИТЕЛЬНО IPv4 (решает проблему ENETUNREACH на некоторых серверах)
+        family: 4, 
         tls: {
-          // Игнорируем проверку сертификатов (частая причина сбоев на VPS/Cloud)
           rejectUnauthorized: false,
           minVersion: 'TLSv1.2'
         },
