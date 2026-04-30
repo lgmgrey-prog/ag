@@ -133,7 +133,7 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
     <nav className="border-b border-black/5 bg-white/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.href = '/'}>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.hash = '#'}>
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold">
               <Package size={18} />
             </div>
@@ -142,19 +142,10 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
           
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-600">
             <button onClick={() => {
-              if (user) {
-                // If logged in, we need to go to landing first or handle it
-                window.location.href = '/#suppliers';
-              } else {
-                document.getElementById('suppliers')?.scrollIntoView({ behavior: 'smooth' });
-              }
+              window.location.hash = '#suppliers';
             }} className="hover:text-emerald-600 transition-colors">Поставщики</button>
             <button onClick={() => {
-              if (user) {
-                window.location.href = '/#about';
-              } else {
-                document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' });
-              }
+              window.location.hash = '#about';
             }} className="hover:text-emerald-600 transition-colors">О проекте</button>
           </div>
 
@@ -1562,7 +1553,7 @@ const ChatWindow = ({ user, targetContactId }: { user: User, targetContactId?: n
             </div>
           ) : (
             <>
-              {selectedConv && !conversations.find(c => c.id === selectedConv.id) && (
+              {selectedConv && !conversations.find(c => String(c.id) === String(selectedConv.id)) && (
                 <button
                   onClick={() => setSelectedConv(selectedConv)}
                   className="w-full p-4 flex gap-3 items-start bg-white border-l-4 border-l-emerald-600 border-b border-zinc-100/50"
@@ -2919,7 +2910,13 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
 
       showToast?.('Заказ успешно оформлен! Заявки отправлены поставщикам в чат.');
       setCart([]);
-      setActiveTab('chat'); // Redirect to chat to see the sent messages
+      
+      // Set the last messaged supplier as the active chat target
+      const lastSupplierId = Object.keys(ordersBySupplier).pop();
+      if (lastSupplierId) {
+        setChatTargetId(parseInt(lastSupplierId));
+      }
+      setActiveTab('chat'); 
     } catch (err) {
       console.error(err);
       showToast?.('Ошибка при оформлении заказа', 'error');
@@ -6026,6 +6023,30 @@ export default function App() {
   const [legalModal, setLegalModal] = useState<{ isOpen: boolean, key: string }>({ isOpen: false, key: 'public_offer' });
   const [requestedTab, setRequestedTab] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  const [showLanding, setShowLanding] = useState(false);
+
+  // Handle URL hash changes
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#about' || hash === '#suppliers' || hash === '#pricing' || hash === '#hero') {
+        setShowLanding(true);
+        setTimeout(() => {
+          document.getElementById(hash.substring(1))?.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+      } else if (hash === '' || hash === '#') {
+        setShowLanding(false);
+      } else {
+        // If it's a specific tab in dashboard, don't show landing
+        setShowLanding(false);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    // Initial check
+    handleHashChange();
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -6135,7 +6156,7 @@ export default function App() {
       />
       
       <main>
-        {user ? (
+        {user && !showLanding ? (
           user.type === 'restaurant' ? (
             <RestaurantDashboard user={user} requestedTab={requestedTab} onTabHandled={() => setRequestedTab(null)} showToast={showToast} onPayment={handlePayment} onUpdateUser={handleUpdateUser} />
           ) : user.type === 'admin' ? (
@@ -6196,12 +6217,10 @@ export default function App() {
               <h4 className="font-bold text-zinc-900 mb-6">Сервис</h4>
               <ul className="space-y-4 text-sm text-zinc-500">
                 <li><button onClick={() => {
-                  if (user) window.location.href = '/#about';
-                  else document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' });
+                  window.location.hash = '#about';
                 }} className="hover:text-emerald-600 transition-colors">О проекте</button></li>
                 <li><button onClick={() => {
-                  if (user) window.location.href = '/#pricing';
-                  else document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+                  window.location.hash = '#pricing';
                 }} className="hover:text-emerald-600 transition-colors">Тарифы</button></li>
                 <li><button onClick={() => setIsFeedbackOpen(true)} className="hover:text-emerald-600 transition-colors">Поддержка</button></li>
               </ul>
