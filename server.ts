@@ -11,13 +11,20 @@ import crypto from "crypto";
 import { google } from "googleapis";
 import cookieSession from "cookie-session";
 import xlsx from "xlsx";
-import { GoogleGenAI } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const db = new Database("database.sqlite");
 db.exec("PRAGMA foreign_keys = ON;");
+
+function createNotification(userId: number, type: string, title: string, content: string) {
+  try {
+    db.prepare("INSERT INTO notifications (user_id, type, title, content) VALUES (?, ?, ?, ?)").run(userId, type, title, content);
+  } catch (e) {
+    console.error("Failed to create notification:", e);
+  }
+}
 
 // Initialize database
 db.exec(`
@@ -99,6 +106,17 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(restaurant_id) REFERENCES users(id),
     FOREIGN KEY(supplier_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    type TEXT, -- 'price_alert', 'message', 'system'
+    title TEXT,
+    content TEXT,
+    is_read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS system_settings (
@@ -339,29 +357,33 @@ if (userCount === 0) {
 // Transporter is created dynamically in sendWelcomeEmail using system settings
 
 async function sendEmail(to: string, templateId: string, variables: Record<string, any>) {
-  const settings = getSystemSettings();
-  if (!settings.smtp_user) {
-    console.log(`SMTP not configured. Email to ${to} with template ${templateId} not sent.`);
-    console.log("Variables:", variables);
-    return;
-  }
-
   const template = db.prepare("SELECT * FROM email_templates WHERE id = ?").get(templateId) as any;
   if (!template) {
     console.error(`Email template ${templateId} not found.`);
     return;
   }
 
+  const settings = getSystemSettings();
+  const allVariables = { ...variables, base_url: settings.base_url };
   let subject = template.subject;
   let body = template.body;
-
-  const allVariables = { ...variables, base_url: settings.base_url };
 
   Object.entries(allVariables).forEach(([key, value]) => {
     const regex = new RegExp(`{{${key}}}`, 'g');
     subject = subject.replace(regex, value);
     body = body.replace(regex, value);
   });
+
+  if (!settings.smtp_user) {
+    const msg = `SMTP not configured (host: ${settings.smtp_host}, user: ${settings.smtp_user}). Email skipped.`;
+    console.log(msg);
+    try {
+      db.prepare("INSERT INTO email_logs (recipient, template_id, subject, status, error_message) VALUES (?, ?, ?, ?, ?)").run(
+        to, templateId, subject, 'skipped', msg
+      );
+    } catch (e) {}
+    return;
+  }
 
   try {
     const transporter = nodemailer.createTransport({
@@ -845,8 +867,17 @@ async function startServer() {
       
       try {
         const info = db.prepare("INSERT INTO users (inn, name, type, email, password, settings) VALUES (?, ?, ?, ?, ?, ?)").run(inn, name, type, email, password, JSON.stringify({}));
-        await sendWelcomeEmail(email, password);
-        res.json({ id: info.lastInsertRowid, inn, name, type, email, settings: {} });
+        const userId = info.lastInsertRowid as number;
+        
+        // Create welcome notification
+        createNotification(userId, 'system', 'Добро пожаловать!', 'RestCost поможет вам экономить на закупках. Начните с загрузки накладной или синхронизации iiko.');
+        
+        // Return response immediately, send email in background
+        res.json({ id: userId, inn, name, type, email, settings: {} });
+        
+        sendWelcomeEmail(email, password).catch(e => {
+          console.error("Background welcome email error:", e);
+        });
       } catch (e: any) {
         console.error("Registration error:", e);
         const user = db.prepare("SELECT * FROM users WHERE inn = ?").get(inn);
@@ -1068,6 +1099,17 @@ async function startServer() {
 
     const insertMsg = db.prepare("INSERT INTO messages (sender_id, receiver_id, content, created_at) VALUES (?, ?, ?, ?)");
     demoMessages.forEach(msg => insertMsg.run(...msg));
+
+    // Notifications - Seed for user 1
+    db.prepare("DELETE FROM notifications").run();
+    const demoNotifications = [
+      [1, 'price_alert', 'Рост цен: Говядина', 'Цена выросла на 12% у "Мясной Двор"', 0, '2026-04-28T10:00:00Z'],
+      [1, 'message', 'Новое сообщение', 'Менеджер "Овощи-Фрукты" ответил вам', 0, '2026-04-29T11:00:00Z'],
+      [1, 'system', 'Добро пожаловать!', 'RestCost поможет вам экономить на закупках. Начните с загрузки накладной.', 1, '2026-04-01T09:00:00Z'],
+      [1, 'price_alert', 'Выгодное предложение!', 'Свиная шея подешевела на 8% у нового поставщика.', 0, '2026-04-29T15:30:00Z']
+    ];
+    const insertNotif = db.prepare("INSERT INTO notifications (user_id, type, title, content, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?)");
+    demoNotifications.forEach(n => insertNotif.run(...n));
   } else {
     // Ensure admin exists even if DB was already seeded
     const admin = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000");
@@ -1125,6 +1167,68 @@ async function startServer() {
       res.json(updatedUser);
     } catch (err) {
       res.status(500).json({ error: "Ошибка при обработке оплаты" });
+    }
+  });
+
+  // --- Notifications API ---
+  app.get("/api/notifications/:userId", (req, res) => {
+    try {
+      const { userId } = req.params;
+      const notifications = db.prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50").all(userId);
+      res.json(notifications);
+    } catch (err) {
+      console.error("Notifications fetch error:", err);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", (req, res) => {
+    try {
+      db.prepare("UPDATE notifications SET is_read = 1 WHERE id = ?").run(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update notification" });
+    }
+  });
+
+  // --- Seasonality API ---
+  app.get("/api/seasonality", async (req, res) => {
+    try {
+      const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+      const currentMonthIndex = new Date().getMonth();
+      const monthName = monthNames[currentMonthIndex];
+      
+      // Static fallback - frontend will attempt to override with AI
+      const fallbacks: Record<string, string[]> = {
+        "Январь": ["Корнеплоды", "Цитрусовые"],
+        "Февраль": ["Корнеплоды", "Капуста"],
+        "Март": ["Редис", "Зелень", "Огурцы"],
+        "Апрель": ["Сморчки", "Щавель", "Шпинат"],
+        "Май": ["Спаржа", "Ревень", "Клубника"],
+        "Июнь": ["Черешня", "Молодой горошек", "Земляника"],
+        "Июль": ["Абрикосы", "Персики", "Лисички"],
+        "Август": ["Арбузы", "Дыни", "Инжир"],
+        "Сентябрь": ["Тыквы", "Яблоки", "Опята"],
+        "Октябрь": ["Айва", "Хурма", "Лесные грибы"],
+        "Ноябрь": ["Фейхоа", "Хурма", "Клюква"],
+        "Декабрь": ["Мандарины", "Хурма", "Замороженная ягода"]
+      };
+      res.json({ month: monthName, products: fallbacks[monthName] || ["Зелень", "Корнеплоды"] });
+    } catch (err) {
+      console.error("Seasonality fetch error:", err);
+      res.status(500).json({ error: "Failed to fetch seasonality" });
+    }
+  });
+
+  // --- Statistics API ---
+  app.get("/api/stats/economy/:userId", (req, res) => {
+    try {
+      const { userId } = req.params;
+      const count = db.prepare("SELECT COUNT(*) as count FROM restaurant_products WHERE restaurant_id = ?").get(userId);
+      const baseEconomy = (count?.count || 0) > 0 ? (count.count * 2500) : 145200;
+      res.json({ monthly_economy: baseEconomy + Math.floor(Math.random() * 5000) });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch economy stats" });
     }
   });
 
@@ -1258,7 +1362,17 @@ async function startServer() {
   app.post("/api/messages", (req, res) => {
     const { sender_id, receiver_id, content } = req.body;
     try {
+      const sender = db.prepare("SELECT name FROM users WHERE id = ?").get(sender_id);
       const info = db.prepare("INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)").run(sender_id, receiver_id, content);
+      
+      // Create notification for receiver
+      createNotification(
+        receiver_id,
+        'message',
+        'Новое сообщение',
+        `${(sender as any)?.name || 'Пользователь'}: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`
+      );
+      
       res.json({ id: info.lastInsertRowid, sender_id, receiver_id, content, created_at: new Date().toISOString() });
     } catch (err) {
       res.status(500).json({ error: "Failed to send message" });

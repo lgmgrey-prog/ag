@@ -116,25 +116,28 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
   );
 };
 
-const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, onNotificationClick }: { 
+const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, onNotificationClick, notifications = [], onMarkRead }: { 
   user: User | null, 
   onLogout: () => void, 
   onOpenAuth: () => void,
   onOpenSettings: () => void,
   onOpenFeedback: () => void,
-  onNotificationClick?: (type: string) => void
+  onNotificationClick?: (type: string) => void,
+  notifications?: Notification[],
+  onMarkRead?: (id: number) => void
 }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
     <nav className="border-b border-black/5 bg-white/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.href = '/'}>
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold">
               <Package size={18} />
             </div>
-            <span className="text-xl font-bold tracking-tight text-zinc-900">Агрегатор</span>
+            <span className="text-xl font-bold tracking-tight text-zinc-900">RestCost</span>
           </div>
           
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-600">
@@ -151,7 +154,11 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
                     className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition-colors relative"
                   >
                     <Bell size={18} className="text-zinc-600 sm:w-5 sm:h-5" />
-                    <span className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full border-2 border-white flex items-center justify-center shadow-sm">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
                   </button>
                   
                   <AnimatePresence>
@@ -171,26 +178,38 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
                             </button>
                           </div>
                           <div className="max-h-96 overflow-y-auto p-2 space-y-1">
-                            <div 
-                              onClick={() => { onNotificationClick?.('price_alert'); setIsNotificationsOpen(false); }}
-                              className="flex gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors"
-                            >
-                              <AlertCircle className="text-amber-600 shrink-0" size={18} />
-                              <div>
-                                <p className="text-sm font-bold text-amber-900">Рост цен: Говядина</p>
-                                <p className="text-xs text-amber-700">Цена выросла на 12% у 'Мясной Двор'</p>
+                            {notifications.length > 0 ? (
+                              notifications.map(n => (
+                                <div 
+                                  key={n.id}
+                                  onClick={() => { 
+                                    onNotificationClick?.(n.type); 
+                                    onMarkRead?.(n.id);
+                                    setIsNotificationsOpen(false); 
+                                  }}
+                                  className={`flex gap-3 p-3 rounded-xl transition-colors cursor-pointer border ${
+                                    n.is_read ? 'bg-white border-transparent hover:bg-zinc-50' : 'bg-emerald-50 border-emerald-100'
+                                  }`}
+                                >
+                                  <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
+                                    n.type === 'price_alert' ? 'bg-amber-100 text-amber-600' : 
+                                    n.type === 'message' ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 text-zinc-600'
+                                  }`}>
+                                    {n.type === 'price_alert' ? <AlertCircle size={16} /> : 
+                                     n.type === 'message' ? <MessageSquare size={16} /> : <Bell size={16} />}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-bold text-zinc-900 truncate">{n.title}</p>
+                                    <p className="text-xs text-zinc-500 line-clamp-2">{n.content}</p>
+                                    <p className="text-[10px] text-zinc-400 mt-1">{new Date(n.created_at).toLocaleDateString()}</p>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-8 text-center text-zinc-400 italic text-sm">
+                                Нет новых уведомлений
                               </div>
-                            </div>
-                            <div 
-                              onClick={() => { onNotificationClick?.('chat'); setIsNotificationsOpen(false); }}
-                              className="flex gap-3 p-3 rounded-xl hover:bg-zinc-50 transition-colors cursor-pointer"
-                            >
-                              <MessageSquare className="text-zinc-400 shrink-0" size={18} />
-                              <div>
-                                <p className="text-sm font-bold text-zinc-900">Новое сообщение</p>
-                                <p className="text-xs text-zinc-500">Менеджер 'Овощи-Фрукты' ответил вам</p>
-                              </div>
-                            </div>
+                            )}
                           </div>
                           <div className="p-3 bg-zinc-50 border-t border-zinc-100 text-center">
                             <button className="text-xs font-bold text-emerald-600 hover:text-emerald-700">Показать все</button>
@@ -2653,6 +2672,8 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [seasonality, setSeasonality] = useState<{ month: string, products: string[] } | null>(null);
+  const [monthlyEconomy, setMonthlyEconomy] = useState<number>(145200);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'invoices' | 'integrations' | 'cart' | 'suppliers' | 'settings' | 'catalog'>('dashboard');
   const [selectedPrice, setSelectedPrice] = useState<PriceRecord | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -2691,6 +2712,21 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const sRes = await fetch('/api/seasonality');
+      if (sRes.ok) setSeasonality(await sRes.json());
+      const eRes = await fetch(`/api/stats/economy/${user.id}`);
+      if (eRes.ok) setMonthlyEconomy((await eRes.json()).monthly_economy);
+    } catch (e) {
+      console.error('Fetch stats error:', e);
+    }
+  }, [user.id]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   const handleAnalyze = async () => {
     setLoading(true);
@@ -2940,8 +2976,8 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
               
               <div className="bg-zinc-900 text-white rounded-2xl p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Сезонность: Март</p>
-                  <p className="text-xs sm:text-sm font-medium">Редис, Зелень</p>
+                  <p className="text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Сезонность: {seasonality?.month || '...'}</p>
+                  <p className="text-xs sm:text-sm font-medium">{seasonality?.products.join(', ') || 'Загрузка...'}</p>
                 </div>
                 <TrendingUp size={24} className="text-emerald-400 opacity-50" />
               </div>
@@ -2949,7 +2985,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
               <div className="bg-white border border-zinc-200 rounded-2xl p-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Экономия (мес)</p>
-                  <p className="text-lg sm:text-xl font-bold text-emerald-600">145 200 ₽</p>
+                  <p className="text-lg sm:text-xl font-bold text-emerald-600">{monthlyEconomy.toLocaleString()} ₽</p>
                 </div>
                 <TrendingDown size={24} className="text-emerald-600 opacity-20" />
               </div>
@@ -3985,6 +4021,15 @@ const SystemSettingsView = () => {
                                 <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-[10px] uppercase">
                                   <Check size={12} /> Успешно
                                 </span>
+                              ) : log.status === 'skipped' ? (
+                                <div className="space-y-1">
+                                  <span className="inline-flex items-center gap-1 text-amber-600 font-bold text-[10px] uppercase">
+                                    <AlertCircle size={12} /> Пропущено
+                                  </span>
+                                  <p className="text-[10px] text-amber-500 font-medium max-w-xs break-words">
+                                    {log.error_message}
+                                  </p>
+                                </div>
                               ) : (
                                 <div className="space-y-1">
                                   <span className="inline-flex items-center gap-1 text-red-600 font-bold text-[10px] uppercase">
@@ -5586,6 +5631,7 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
       return;
     }
 
+    setIsVerifying(true);
     const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
     const body = mode === 'register' 
       ? { inn, name: orgName, type, email }
@@ -5608,6 +5654,8 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
     } catch (err: any) {
       console.error('Auth fetch error:', err);
       setError(err.message || 'Ошибка при входе. Пожалуйста, попробуйте позже.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -5763,9 +5811,12 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
 
             <button 
               disabled={isVerifying}
-              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
+              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isVerifying ? 'Проверка...' : mode === 'login' ? 'Войти' : verificationStep === 'input' ? 'Продолжить' : 'Зарегистрироваться'}
+              {isVerifying && <RefreshCw size={20} className="animate-spin" />}
+              {isVerifying 
+                ? (mode === 'login' ? 'Вход...' : (verificationStep === 'input' ? 'Проверка ИНН...' : 'Регистрация...')) 
+                : (mode === 'login' ? 'Войти' : (verificationStep === 'input' ? 'Продолжить' : 'Зарегистрироваться'))}
             </button>
 
             <div className="text-center">
@@ -5792,6 +5843,7 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [legalModal, setLegalModal] = useState<{ isOpen: boolean, key: string }>({ isOpen: false, key: 'public_offer' });
@@ -5812,6 +5864,37 @@ export default function App() {
       }
     }
   }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/notifications/${user.id}`);
+      if (res.ok) {
+        setNotifications(await res.json());
+      }
+    } catch (err) {
+      console.error('Fetch notifications error:', err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 60000); // Check every minute
+      return () => clearInterval(interval);
+    } else {
+      setNotifications([]);
+    }
+  }, [user, fetchNotifications]);
+
+  const handleMarkRead = async (id: number) => {
+    try {
+      await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: 1 } : n));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleAuth = (u: User, isNew: boolean = false) => {
     setUser(u);
@@ -5865,6 +5948,8 @@ export default function App() {
         onOpenAuth={() => setIsAuthOpen(true)} 
         onOpenSettings={() => setRequestedTab('settings')}
         onOpenFeedback={() => setIsFeedbackOpen(true)}
+        notifications={notifications}
+        onMarkRead={handleMarkRead}
         onNotificationClick={(type) => {
           if (type === 'chat') setRequestedTab('chat');
           if (type === 'price_alert') setRequestedTab('prices');

@@ -54,3 +54,13 @@ export interface SupplierDetail extends Supplier {
     updated_at: string;
   }[];
 }
+
+export interface Notification {
+  id: number;
+  user_id: number;
+  type: 'price_alert' | 'message' | 'system';
+  title: string;
+  content: string;
+  is_read: number;
+  created_at: string;
+}
