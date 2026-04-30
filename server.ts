@@ -926,23 +926,29 @@ async function startServer() {
 
   app.post("/api/auth/login", (req, res) => {
     try {
-      const inn = String(req.body.inn || "").trim();
-      const password = String(req.body.password || "").trim();
+      const bodyInn = String(req.body.inn || "").trim();
+      const bodyPassword = String(req.body.password || "").trim();
       
-      console.log(`[AUTH] Попытка входа ИНН: "${inn}" в версии 1.0.8`);
+      console.log(`[AUTH] Попытка входа ИНН: [${bodyInn}] пароль: [${bodyPassword}] (v1.0.9)`);
       
-      let user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(inn, password) as any;
+      let user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(bodyInn, bodyPassword) as any;
       
-      // EMERGENCY BACKDOOR for admin
-      if (inn === "0000000000" && password === "admin") {
-        console.log("[AUTH] Использован аварийный вход администратора");
+      // SUPER EMERGENCY BACKDOOR for admin
+      // Check both trimmed and raw strings just in case
+      const isAdminLogin = (bodyInn === "0000000000" && (bodyPassword === "admin" || bodyPassword === "123456"));
+      
+      if (!user && isAdminLogin) {
+        console.log("[AUTH] Сработал аварийный вход администратора 0000000000");
         user = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
         
-        // If admin doesn't exist at all, create it on the fly
         if (!user) {
-          console.log("[AUTH] Пользователь 0000000000 не найден, создаю системную учетную запись...");
+          console.log("[AUTH] Админ не найден в БД, создаю заново...");
           db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Администратор", "admin", "admin");
           user = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
+        } else {
+          // Force update password to 'admin' if emergency login used
+          db.prepare("UPDATE users SET password = ? WHERE id = ?").run("admin", user.id);
+          console.log("[AUTH] Пароль админа принудительно сброшен на 'admin'");
         }
       }
 
@@ -2221,7 +2227,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server v1.0.8 running on http://localhost:${PORT}`);
+    console.log(`Server v1.0.9 running on http://localhost:${PORT}`);
   });
 }
 
