@@ -479,17 +479,17 @@ async function startServer() {
   });
 
   app.get("/api/debug-ping", (req, res) => {
-    console.log("[DEBUG] Ping hit v1.9.0");
+    console.log("[DEBUG] Ping hit v2.1.0");
     return res.status(200).json({ 
       status: "OK", 
-      version: "1.9.0", 
-      message: "Server logic updated",
+      version: "2.1.0", 
+      message: "Server updated - Checking for IPv4 force",
       time: new Date().toISOString() 
     });
   });
 
   app.get("/api/debug/test-smtp", async (req, res) => {
-    console.log("[SMTP TEST] Triggered v1.9.0");
+    console.log("[SMTP TEST] Triggered v2.1.0");
     const settings = getSystemSettings();
     const testEmail = req.query.email as string || settings.smtp_user;
     
@@ -498,7 +498,7 @@ async function startServer() {
         return res.status(400).json({ error: "Настройки SMTP отсутствуют в БД (host, user или pass пустые)" });
       }
 
-      console.log(`[SMTP-TEST] Using config: ${settings.smtp_host}:${settings.smtp_port} as ${settings.smtp_user}`);
+      console.log(`[SMTP-TEST] Target: ${settings.smtp_host}:${settings.smtp_port} via ${settings.smtp_user} (v2.1.0)`);
 
       const transporter = nodemailer.createTransport({
         host: settings.smtp_host,
@@ -508,34 +508,35 @@ async function startServer() {
           user: settings.smtp_user,
           pass: settings.smtp_pass,
         },
-        // ПРИНУДИТЕЛЬНО IPv4 (решает проблему ENETUNREACH на некоторых серверах)
-        family: 4, 
+        family: 4, // ПРИНУДИТЕЛЬНО IPv4
         tls: {
           rejectUnauthorized: false,
           minVersion: 'TLSv1.2'
         },
-        connectionTimeout: 10000,
-        greetingTimeout: 5000
-      });
+        connectionTimeout: 15000,
+        greetingTimeout: 10000,
+        debug: true,
+        logger: true
+      } as any);
 
-      console.log("[SMTP-TEST] Verifying connection...");
+      console.log("[SMTP-TEST] Connecting (Forcing IPv4)...");
       await transporter.verify();
       
-      console.log("[SMTP-TEST] Sending email...");
+      console.log("[SMTP-TEST] Sending...");
       const info = await transporter.sendMail({
         from: `"RestCost Test" <${settings.smtp_from || settings.smtp_user}>`,
         to: testEmail,
-        subject: "Проверка SMTP v1.9.0",
-        text: "Эта проверка подтверждает, что сервер может отправлять почту.",
-        html: "<b>SMTP работает корректно в версии 1.9.0.</b>"
+        subject: "Проверка SMTP v2.1.0",
+        text: "Успешная проверка IPv4 на версии 2.1.0.",
+        html: "<b>SMTP работает корректно (Force IPv4) в версии 2.1.0.</b>"
       });
 
       console.log("[SMTP-TEST] SUCCESS!");
       return res.json({ 
         success: true, 
+        v: "2.1.0",
         message: `Письмо отправлено на ${testEmail}`,
-        response: info.response,
-        messageId: info.messageId
+        response: info.response
       });
     } catch (err: any) {
       console.error("[SMTP-TEST] FAILED:", err);
@@ -543,8 +544,10 @@ async function startServer() {
         error: "Ошибка SMTP", 
         message: err.message, 
         code: err.code,
-        command: err.command,
-        v: "1.9.0"
+        syscall: err.syscall,
+        address: err.address,
+        dns_family: err.family,
+        v: "2.1.0"
       });
     }
   });
@@ -1112,8 +1115,8 @@ async function startServer() {
       } else {
         console.warn(`[AUTH] NO v1.8.0: [${bodyInn}]`);
         res.status(401).json({ 
-          error: "ОШИБКА: СЕРВЕР ОБНОВЛЕН ДО v1.9.0, НО ПАРОЛЬ НЕВЕРНЫЙ", 
-          v: "1.9.0"
+          error: "ОШИБКА: СЕРВЕР ОБНОВЛЕН ДО v2.1.0, НО ПАРОЛЬ НЕВЕРНЫЙ", 
+          v: "2.1.0"
         });
       }
     } catch (err: any) {
@@ -2379,7 +2382,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server v1.9.0 running on http://localhost:${PORT}`);
+    console.log(`Server v2.1.0 running on http://localhost:${PORT}`);
   });
 }
 
