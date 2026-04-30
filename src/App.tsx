@@ -141,8 +141,21 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
           </div>
           
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-600">
-            <a href="#promotions" className="hover:text-emerald-600 transition-colors">Акции</a>
-            <a href="#suppliers" className="hover:text-emerald-600 transition-colors">Поставщики</a>
+            <button onClick={() => {
+              if (user) {
+                // If logged in, we need to go to landing first or handle it
+                window.location.href = '/#suppliers';
+              } else {
+                document.getElementById('suppliers')?.scrollIntoView({ behavior: 'smooth' });
+              }
+            }} className="hover:text-emerald-600 transition-colors">Поставщики</button>
+            <button onClick={() => {
+              if (user) {
+                window.location.href = '/#about';
+              } else {
+                document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' });
+              }
+            }} className="hover:text-emerald-600 transition-colors">О проекте</button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
@@ -588,71 +601,6 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
             <p className="text-4xl font-bold text-zinc-900 mb-2">100%</p>
             <p className="text-zinc-500 font-medium">Прозрачность закупок</p>
           </div>
-        </div>
-      </div>
-    </section>
-
-    {/* Promotions Section */}
-    <section id="promotions" className="py-24 bg-white overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-12">
-          <div>
-            <div className="inline-block px-4 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4">
-              Горячие предложения
-            </div>
-            <h2 className="text-4xl font-bold text-zinc-900 tracking-tight">Актуальные акции</h2>
-          </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => {
-                const el = document.getElementById('promo-slider');
-                if (el) el.scrollBy({ left: -350, behavior: 'smooth' });
-              }}
-              className="w-12 h-12 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-zinc-900 hover:border-zinc-900 transition-all active:scale-95"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <button 
-              onClick={() => {
-                const el = document.getElementById('promo-slider');
-                if (el) el.scrollBy({ left: 350, behavior: 'smooth' });
-              }}
-              className="w-12 h-12 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-zinc-900 hover:border-zinc-900 transition-all active:scale-95"
-            >
-              <ChevronRight size={24} />
-            </button>
-          </div>
-        </div>
-
-        <div id="promo-slider" className="flex gap-6 overflow-x-auto pb-8 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory">
-          {[
-            { supplier: 'Global Foods', title: 'Скидка на морепродукты', desc: 'При заказе от 50 000 ₽ скидка 10% на весь ассортимент креветок и мидий.', color: 'from-emerald-500 to-teal-400' },
-            { supplier: 'Мясной Мир', title: 'Бонус за говядину', desc: 'Закажите 100кг вырезки и получите 5кг в подарок. Только до конца недели!', color: 'from-emerald-500 to-teal-500' },
-            { supplier: 'Вег-Маркет', title: 'Тропический микс', desc: 'Спелые манго и ананасы по оптовым ценам напрямую из Эквадора.', color: 'from-emerald-600 to-teal-400' },
-            { supplier: 'Молочный Край', title: 'Сырная неделя', desc: 'Пармезан и Моцарелла со скидкой 15%. Идеально для пиццерий.', color: 'from-emerald-500 to-emerald-400' }
-          ].map((promo, i) => (
-            <motion.div 
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              viewport={{ once: true }}
-              className="min-w-[300px] md:min-w-[380px] bg-white border border-zinc-100 rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-xl transition-all group snap-start"
-            >
-              <div className={`h-32 bg-gradient-to-br ${promo.color} p-8 flex items-end relative overflow-hidden`}>
-                <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">Акция</div>
-                <h3 className="text-white font-bold text-xl relative z-10">{promo.supplier}</h3>
-                <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-              </div>
-              <div className="p-8">
-                <h4 className="font-bold text-zinc-900 text-lg mb-3">{promo.title}</h4>
-                <p className="text-zinc-500 text-sm leading-relaxed mb-6 h-12 line-clamp-2">{promo.desc}</p>
-                <button className="flex items-center gap-2 text-sm font-bold text-emerald-600 group-hover:gap-3 transition-all">
-                  Подробнее <ArrowRight size={16} />
-                </button>
-              </div>
-            </motion.div>
-          ))}
         </div>
       </div>
     </section>
@@ -6247,8 +6195,14 @@ export default function App() {
             <div className="col-span-1">
               <h4 className="font-bold text-zinc-900 mb-6">Сервис</h4>
               <ul className="space-y-4 text-sm text-zinc-500">
-                <li><a href="#about" className="hover:text-emerald-600 transition-colors">О проекте</a></li>
-                <li><a href="#pricing" className="hover:text-emerald-600 transition-colors">Тарифы</a></li>
+                <li><button onClick={() => {
+                  if (user) window.location.href = '/#about';
+                  else document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' });
+                }} className="hover:text-emerald-600 transition-colors">О проекте</button></li>
+                <li><button onClick={() => {
+                  if (user) window.location.href = '/#pricing';
+                  else document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+                }} className="hover:text-emerald-600 transition-colors">Тарифы</button></li>
                 <li><button onClick={() => setIsFeedbackOpen(true)} className="hover:text-emerald-600 transition-colors">Поддержка</button></li>
               </ul>
             </div>
