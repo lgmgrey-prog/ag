@@ -5575,9 +5575,22 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
     setResetMessage('');
     
     try {
+      setIsVerifying(true);
+      setError('');
+      setResetMessage('');
+      
       // First find user email by INN
       const userRes = await fetch(`/api/users/by-inn/${inn}`);
-      const userData = await userRes.json();
+      
+      let userData;
+      const contentType = userRes.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        userData = await userRes.json();
+      } else {
+        const text = await userRes.text();
+        console.error("Non-JSON response from by-inn:", text);
+        throw new Error(`Сервер вернул ошибку (${userRes.status}). Проверьте подключение.`);
+      }
       
       if (!userRes.ok) {
         throw new Error(userData.error || 'Пользователь не найден');
@@ -5593,14 +5606,26 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
         body: JSON.stringify({ email: userData.email })
       });
       
-      const data = await res.json();
+      let data;
+      const resContentType = res.headers.get('content-type');
+      if (resContentType && resContentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        console.error("Non-JSON response from forgot-password:", text);
+        throw new Error(`Ошибка сервера при сбросе пароля (${res.status}).`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || 'Ошибка при восстановлении пароля');
       }
       
       setResetMessage(`Новый пароль отправлен на ${userData.email}`);
     } catch (err: any) {
+      console.error("Forgot password error:", err);
       setError(err.message);
+    } finally {
+      setIsVerifying(false);
     }
   };
 
