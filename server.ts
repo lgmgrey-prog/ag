@@ -929,25 +929,47 @@ async function startServer() {
       const bodyInn = String(req.body.inn || "").trim();
       const bodyPassword = String(req.body.password || "").trim();
       
-      console.log(`[AUTH] Login attempt v1.1.0 - INN: [${bodyInn}]`);
+      console.log(`[AUTH] Login attempt v1.2.0 - INN: [${bodyInn}]`);
       
-      // 1. HARDCODED ADMIN CHECK (Skip DB for emergency)
+      // 1. ABSOLUTE HARDCODED ADMIN BYPASS
       if (bodyInn === "0000000000" && (bodyPassword === "admin" || bodyPassword === "123456")) {
-        console.log("[AUTH] EMERGENCY ADMIN LOGIN TRIGGERED");
-        let admin = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
+        console.log("[AUTH] !!! EMERGENCY BYPASS TRIGGERED !!!");
+        let adminUser: any = null;
         
-        if (!admin) {
-          console.log("[AUTH] Admin not in DB, creating...");
-          db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Администратор", "admin", "admin");
-          admin = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000") as any;
-        } else if (admin.password !== "admin") {
-          db.prepare("UPDATE users SET password = ? WHERE id = ?").run("admin", admin.id);
-          admin.password = "admin";
+        try {
+          adminUser = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000");
+          if (!adminUser) {
+            db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Администратор", "admin", "admin");
+            adminUser = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000");
+          } else if (adminUser.password !== "admin") {
+            db.prepare("UPDATE users SET password = ? WHERE id = ?").run("admin", adminUser.id);
+            adminUser.password = "admin";
+          }
+        } catch (dbErr) {
+          console.error("[AUTH] DB Error in emergency bypass, using memory-only user:", dbErr);
         }
-        
-        if (admin.settings) admin.settings = JSON.parse(admin.settings);
-        if (admin.subscription) admin.subscription = JSON.parse(admin.subscription);
-        return res.json(admin);
+
+        const responseUser = adminUser || {
+          id: 0,
+          inn: "0000000000",
+          name: "Администратор (Аварийный режим)",
+          type: "admin",
+          email: "admin@localhost",
+          settings: "{}"
+        };
+
+        // Safe JSON parsing
+        const parseSafely = (val: any) => {
+          if (!val) return {};
+          if (typeof val === 'object') return val;
+          try { return JSON.parse(val); } catch (e) { return {}; }
+        };
+
+        return res.json({
+          ...responseUser,
+          settings: parseSafely(responseUser.settings),
+          subscription: parseSafely(responseUser.subscription)
+        });
       }
       
       // 2. REGULAR LOGIN
@@ -955,19 +977,27 @@ async function startServer() {
       
       if (user) {
         db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
-        if (user.settings) user.settings = JSON.parse(user.settings);
-        if (user.subscription) user.subscription = JSON.parse(user.subscription);
-        res.json(user);
+        const parseSafely = (val: any) => {
+          if (!val) return {};
+          if (typeof val === 'object') return val;
+          try { return JSON.parse(val); } catch (e) { return {}; }
+        };
+
+        res.json({
+          ...user,
+          settings: parseSafely(user.settings),
+          subscription: parseSafely(user.subscription)
+        });
       } else {
         res.status(401).json({ 
           error: "Неверный ИНН или пароль", 
-          v: "1.1.0",
+          v: "1.2.0",
           tried: bodyInn 
         });
       }
     } catch (err: any) {
-      console.error("Login error:", err);
-      res.status(500).json({ error: "Ошибка при входе в систему" });
+      console.error("Login fatal error:", err);
+      res.status(500).json({ error: "Критическая ошибка сервера при входе" });
     }
   });
 
@@ -2228,7 +2258,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server v1.1.0 running on http://localhost:${PORT}`);
+    console.log(`Server v1.2.0 running on http://localhost:${PORT}`);
   });
 }
 
