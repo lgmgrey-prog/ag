@@ -7,6 +7,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import dns from "dns";
+import { GoogleGenAI } from "@google/genai";
 
 if (typeof dns.setDefaultResultOrder === 'function') {
   dns.setDefaultResultOrder('ipv4first');
@@ -418,7 +419,7 @@ async function sendEmail(to: string, templateId: string, variables: Record<strin
       connectionTimeout: 20000,
       greetingTimeout: 10000,
       socketTimeout: 30000,
-    });
+    } as any);
 
     const fromEmail = settings.smtp_from || settings.smtp_user;
     console.log(`[EMAIL DEBUG] From: ${fromEmail}, Subject: ${subject}`);
@@ -1048,7 +1049,7 @@ async function startServer() {
           pass: settings.smtp_pass,
         },
         connectTimeout: 10000, // 10s
-      });
+      } as any);
 
       console.log(`[SMTP DEBUG] Verifying connection...`);
       await transporter.verify();

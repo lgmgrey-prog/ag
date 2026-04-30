@@ -50,7 +50,7 @@ import {
   FileClock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail } from './types';
+import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail, Notification } from './types';
 import { analyzePrices, recognizeInvoice } from './services/geminiService';
 import { SupplierImport } from './components/SupplierImport';
 import LegalModal from './components/LegalModal';
@@ -3351,8 +3351,7 @@ const SystemSettingsView = () => {
         const text = await res.text();
         console.error("Non-JSON response from server:", text);
         setTestEmailResult({ 
-          text: `Ошибка сервера (${res.status})`, 
-          details: `Сервер вернул не JSON ответ (вероятно HTML). Проверьте настройки HTTPS и URL сервера. Содержимое: ${text.substring(0, 100)}...`,
+          text: `Ошибка сервера (${res.status}): Сервер вернул не JSON ответ (вероятно HTML). Проверьте настройки HTTPS и URL сервера. Содержимое: ${text.substring(0, 100)}...`, 
           type: 'error' 
         });
       }
