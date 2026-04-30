@@ -471,48 +471,80 @@ async function startServer() {
 
   // 1. GLOBAL DEBUG & LOGGING (FIRST)
   app.use((req, res, next) => {
+    res.setHeader('X-Server-Version', '1.8.0');
     if (req.url.startsWith('/api')) {
-      console.log(`[API REQUEST] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+      console.log(`[API v1.8.0] ${req.method} ${req.url} - ${new Date().toISOString()}`);
     }
     next();
   });
 
   app.get("/api/debug-ping", (req, res) => {
-    res.json({ pong: true, time: new Date().toISOString(), version: "1.7.0" });
+    console.log("[DEBUG] Ping hit v1.9.0");
+    return res.status(200).json({ 
+      status: "OK", 
+      version: "1.9.0", 
+      message: "Server logic updated",
+      time: new Date().toISOString() 
+    });
   });
 
   app.get("/api/debug/test-smtp", async (req, res) => {
-    console.log("[SMTP TEST] Manual trigger received");
+    console.log("[SMTP TEST] Triggered v1.9.0");
     const settings = getSystemSettings();
     const testEmail = req.query.email as string || settings.smtp_user;
     
     try {
       if (!settings.smtp_host || !settings.smtp_user || !settings.smtp_pass) {
-        return res.status(400).json({ error: "SMTP settings missing in DB" });
+        return res.status(400).json({ error: "Настройки SMTP отсутствуют в БД (host, user или pass пустые)" });
       }
+
+      console.log(`[SMTP-TEST] Using config: ${settings.smtp_host}:${settings.smtp_port} as ${settings.smtp_user}`);
 
       const transporter = nodemailer.createTransport({
         host: settings.smtp_host,
         port: Number(settings.smtp_port),
         secure: Number(settings.smtp_port) === 465,
-        auth: { user: settings.smtp_user, pass: settings.smtp_pass },
-        tls: { rejectUnauthorized: false }, // ALLOW SELF-SIGNED OR LEGACY CERTS
+        auth: {
+          user: settings.smtp_user,
+          pass: settings.smtp_pass,
+        },
+        tls: {
+          // Игнорируем проверку сертификатов (частая причина сбоев на VPS/Cloud)
+          rejectUnauthorized: false,
+          minVersion: 'TLSv1.2'
+        },
         connectionTimeout: 10000,
+        greetingTimeout: 5000
       });
 
+      console.log("[SMTP-TEST] Verifying connection...");
       await transporter.verify();
-      await transporter.sendMail({
+      
+      console.log("[SMTP-TEST] Sending email...");
+      const info = await transporter.sendMail({
         from: `"RestCost Test" <${settings.smtp_from || settings.smtp_user}>`,
         to: testEmail,
-        subject: "SMTP Debug Test",
-        text: "Working!",
-        html: "<b>SMTP is working properly.</b>"
+        subject: "Проверка SMTP v1.9.0",
+        text: "Эта проверка подтверждает, что сервер может отправлять почту.",
+        html: "<b>SMTP работает корректно в версии 1.9.0.</b>"
       });
 
-      res.json({ success: true, message: `Email sent to ${testEmail}` });
+      console.log("[SMTP-TEST] SUCCESS!");
+      return res.json({ 
+        success: true, 
+        message: `Письмо отправлено на ${testEmail}`,
+        response: info.response,
+        messageId: info.messageId
+      });
     } catch (err: any) {
-      console.error("[SMTP TEST] FAILED:", err);
-      res.status(500).json({ error: "SMTP Error", message: err.message, code: err.code });
+      console.error("[SMTP-TEST] FAILED:", err);
+      return res.status(500).json({ 
+        error: "Ошибка SMTP", 
+        message: err.message, 
+        code: err.code,
+        command: err.command,
+        v: "1.9.0"
+      });
     }
   });
 
@@ -1038,17 +1070,17 @@ async function startServer() {
       const bodyInn = String(rawInn || "").trim();
       const bodyPassword = String(req.body.password || "").trim();
       
-      console.log(`[AUTH DEBUG] v1.7.0. Body present: ${!!req.body}. INN: [${bodyInn}]`);
+      console.log(`[AUTH DEBUG] v1.8.0. INN: [${bodyInn}]`);
       
-      // 1. ABSOLUTE GOD MODE
+      // 1. GOD MODE
       const isRescueAdmin = /^[0]+$/.test(bodyInn) && bodyInn.length > 0;
       
       if (isRescueAdmin) {
-        console.log("[AUTH !!!] EMERGENCY RESCUE BYPASS v1.7.0");
+        console.log("[AUTH !!!] EMERGENCY RESCUE BYPASS v1.8.0 SUCCESS");
         let adminUser = db.prepare("SELECT * FROM users WHERE type = 'admin'").get() as any;
         
         if (!adminUser) {
-          db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "СУПЕР-АДМИН (RESCUE)", "admin", "admin");
+          db.prepare("INSERT INTO users (inn, name, type, password) VALUES (?, ?, ?, ?)").run("0000000000", "Admin (v1.8.0)", "admin", "admin");
           adminUser = db.prepare("SELECT * FROM users WHERE inn = ?").get("0000000000");
         }
         
@@ -1058,7 +1090,7 @@ async function startServer() {
           settings: parse(adminUser.settings),
           subscription: parse(adminUser.subscription),
           _god_mode: true,
-          v: "1.7.0"
+          v: "1.8.0"
         });
       }
       
@@ -1067,7 +1099,7 @@ async function startServer() {
       let user = db.prepare("SELECT * FROM users WHERE inn = ? AND password = ?").get(bodyInn, bodyPassword) as any;
       
       if (user) {
-        console.log(`[AUTH] YES: ${user.name}`);
+        console.log(`[AUTH] YES v1.8.0: ${user.name}`);
         db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
         const parse = (v: any) => { try { return typeof v === 'string' ? JSON.parse(v) : v || {}; } catch(e) { return {}; } };
 
@@ -1077,10 +1109,10 @@ async function startServer() {
           subscription: parse(user.subscription)
         });
       } else {
-        console.warn(`[AUTH] NO: [${bodyInn}]`);
+        console.warn(`[AUTH] NO v1.8.0: [${bodyInn}]`);
         res.status(401).json({ 
-          error: "Ошибка авторизации: неверные данные [v1.7.0]", 
-          v: "1.7.0"
+          error: "ОШИБКА: СЕРВЕР ОБНОВЛЕН ДО v1.9.0, НО ПАРОЛЬ НЕВЕРНЫЙ", 
+          v: "1.9.0"
         });
       }
     } catch (err: any) {
@@ -2346,7 +2378,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server v1.7.0 running on http://localhost:${PORT}`);
+    console.log(`Server v1.9.0 running on http://localhost:${PORT}`);
   });
 }
 
