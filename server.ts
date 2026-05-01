@@ -114,6 +114,20 @@ db.exec(`
     FOREIGN KEY(supplier_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS promotions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_id INTEGER,
+    title TEXT NOT NULL,
+    product_name TEXT,
+    description TEXT,
+    price REAL,
+    discount_percent INTEGER,
+    color TEXT,
+    status TEXT DEFAULT 'pending', -- pending, approved, rejected
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(supplier_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -791,6 +805,82 @@ async function startServer() {
     } catch (error) {
       console.error("Import error:", error);
       res.status(500).json({ error: "Failed to import products" });
+    }
+  });
+
+  // Promotions API
+  app.get("/api/promotions", (req, res) => {
+    try {
+      const promotions = db.prepare(`
+        SELECT p.*, u.name as supplier_name 
+        FROM promotions p 
+        JOIN users u ON p.supplier_id = u.id 
+        WHERE p.status = 'approved'
+        ORDER BY p.created_at DESC
+      `).all();
+      res.json(promotions);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch promotions" });
+    }
+  });
+
+  app.get("/api/admin/promotions", (req, res) => {
+    try {
+      const promotions = db.prepare(`
+        SELECT p.*, u.name as supplier_name 
+        FROM promotions p 
+        JOIN users u ON p.supplier_id = u.id 
+        ORDER BY 
+          CASE WHEN p.status = 'pending' THEN 0 ELSE 1 END,
+          p.created_at DESC
+      `).all();
+      res.json(promotions);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch all promotions" });
+    }
+  });
+
+  app.patch("/api/admin/promotions/:id/status", (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    try {
+      db.prepare("UPDATE promotions SET status = ? WHERE id = ?").run(status, id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update promotion status" });
+    }
+  });
+
+  app.get("/api/supplier/promotions/:supplierId", (req, res) => {
+    const { supplierId } = req.params;
+    try {
+      const promotions = db.prepare("SELECT * FROM promotions WHERE supplier_id = ? ORDER BY created_at DESC").all(supplierId);
+      res.json(promotions);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch supplier promotions" });
+    }
+  });
+
+  app.post("/api/supplier/promotions", (req, res) => {
+    const { supplier_id, title, product_name, description, price, discount_percent, color } = req.body;
+    try {
+      const result = db.prepare(`
+        INSERT INTO promotions (supplier_id, title, product_name, description, price, discount_percent, color)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(supplier_id, title, product_name, description, price, discount_percent, color || 'from-emerald-500 to-teal-400');
+      res.json({ id: result.lastInsertRowid, success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to create promotion" });
+    }
+  });
+
+  app.delete("/api/supplier/promotions/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare("DELETE FROM promotions WHERE id = ?").run(id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to delete promotion" });
     }
   });
 

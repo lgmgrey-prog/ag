@@ -116,13 +116,14 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
   );
 };
 
-const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, onNotificationClick, notifications = [], onMarkRead }: { 
+const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, onNotificationClick, notifications = [], onMarkRead, onShowLanding }: { 
   user: User | null, 
   onLogout: () => void, 
   onOpenAuth: () => void,
   onOpenSettings: () => void,
   onOpenFeedback: () => void,
   onNotificationClick?: (type: string) => void,
+  onShowLanding?: () => void,
   notifications?: Notification[],
   onMarkRead?: (id: number) => void
 }) => {
@@ -133,7 +134,10 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
     <nav className="border-b border-black/5 bg-white/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.hash = '#'}>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
+            window.location.hash = '';
+            onShowLanding?.();
+          }}>
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold">
               <Package size={18} />
             </div>
@@ -141,11 +145,25 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
           </div>
           
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-600">
+            {user && (
+              <button 
+                onClick={() => onShowLanding?.()} 
+                className="bg-emerald-50 text-emerald-700 px-4 py-1.5 rounded-full font-bold hover:bg-emerald-100 transition-all"
+              >
+                На главную
+              </button>
+            )}
+            <button onClick={() => {
+              window.location.hash = '#promotions';
+              onShowLanding?.();
+            }} className="hover:text-emerald-600 transition-colors">Акции</button>
             <button onClick={() => {
               window.location.hash = '#suppliers';
+              onShowLanding?.();
             }} className="hover:text-emerald-600 transition-colors">Поставщики</button>
             <button onClick={() => {
               window.location.hash = '#about';
+              onShowLanding?.();
             }} className="hover:text-emerald-600 transition-colors">О проекте</button>
           </div>
 
@@ -520,6 +538,84 @@ const SettingsView = ({ user, onUpdate, showToast }: { user: User, onUpdate: (u:
   );
 };
 
+const LandingPromotions = () => {
+  const [promos, setPromos] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/promotions')
+      .then(res => res.json())
+      .then(data => setPromos(Array.isArray(data) ? data : []));
+  }, []);
+
+  const demoPromos = [
+    { id: 'd1', supplier_name: 'Premium Meat', title: 'Скидка на мраморную говядину', description: 'Специальная цена на Black Angus Prime при заказе от 20 кг. Прямые поставки каждую среду.', color: 'from-emerald-500 to-teal-400', discount_percent: 15 },
+    { id: 'd2', supplier_name: 'Sea Harvest', title: 'Фестиваль устриц', description: 'Устрицы Фин де Клэр №2 по оптовой цене от 100 шт. Оформление за 24 часа. Свежайший улов.', color: 'from-blue-500 to-indigo-500', discount_percent: 10 },
+    { id: 'd3', supplier_name: 'Garden Fresh', title: 'Сезонные фермерские овощи', description: 'Набор сезонных овощей для гриля со скидкой 20%. Свежий урожай от локальных фермеров.', color: 'from-orange-500 to-amber-500', discount_percent: 20 }
+  ];
+
+  const displayedPromos = promos.length > 0 ? promos : demoPromos;
+
+  return (
+    <section id="promotions" className="py-24 bg-zinc-50 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-12">
+          <div>
+            <div className="inline-block px-4 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4">
+              Горячие предложения
+            </div>
+            <h2 className="text-4xl font-bold text-zinc-900 tracking-tight">Актуальные акции</h2>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => document.getElementById('landing-promo-slider')?.scrollBy({ left: -400, behavior: 'smooth' })}
+              className="w-12 h-12 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-zinc-900 hover:border-zinc-900 transition-all active:scale-95"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <button 
+              onClick={() => document.getElementById('landing-promo-slider')?.scrollBy({ left: 400, behavior: 'smooth' })}
+              className="w-12 h-12 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-zinc-900 hover:border-zinc-900 transition-all active:scale-95"
+            >
+              <ChevronRight size={24} />
+            </button>
+          </div>
+        </div>
+
+        <div id="landing-promo-slider" className="flex gap-6 overflow-x-auto pb-8 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory">
+          {displayedPromos.map((promo, i) => (
+            <motion.div 
+              key={promo.id || i}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.1 }}
+              viewport={{ once: true }}
+              className="min-w-[300px] md:min-w-[380px] bg-white rounded-[2.5rem] p-6 shadow-sm border border-emerald-100 group hover:border-emerald-300 transition-all relative overflow-hidden flex flex-col h-[280px] snap-start"
+            >
+              <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${promo.color || 'from-emerald-500 to-teal-400'}`} />
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-2.5 py-1 rounded-full uppercase tracking-tight">Акция</span>
+                {promo.discount_percent && <span className="text-xs font-bold text-emerald-600">-{promo.discount_percent}%</span>}
+              </div>
+              <h3 className="font-bold text-zinc-900 text-xl mb-1 leading-tight">{promo.title}</h3>
+              <p className="text-xs text-zinc-400 mb-4 font-bold">{promo.supplier_name}</p>
+              <p className="text-sm text-zinc-500 line-clamp-3 mb-6 flex-1 italic leading-relaxed">{promo.description}</p>
+              <div className="flex items-center justify-between mt-auto pt-4 border-t border-zinc-50">
+                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Действует сейчас</p>
+                <button 
+                   onClick={() => window.location.hash = '#suppliers'}
+                   className="text-xs font-bold text-emerald-600 hover:underline"
+                >
+                  Узнать больше
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan: 'monthly' | 'yearly') => void }) => (
   <div className="bg-white">
     {/* Hero */}
@@ -562,7 +658,12 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
             >
               Начать экономить <ArrowRight className="group-hover:translate-x-1 transition-transform" />
             </button>
-            <button className="w-full sm:w-auto bg-white text-zinc-900 border border-zinc-200 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-zinc-50 transition-all">
+            <button 
+              onClick={() => {
+                window.location.hash = '#about';
+              }}
+              className="w-full sm:w-auto bg-white text-zinc-900 border border-zinc-200 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-zinc-50 transition-all"
+            >
               Для поставщиков
             </button>
           </motion.div>
@@ -575,6 +676,9 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400 rounded-full blur-3xl" />
       </div>
     </section>
+
+    {/* Promotions */}
+    <LandingPromotions />
 
     {/* Stats */}
     <section className="py-20 bg-zinc-50">
@@ -1470,33 +1574,37 @@ const ChatWindow = ({ user, targetContactId }: { user: User, targetContactId?: n
   };
 
   useEffect(() => {
-    fetch(`/api/conversations/${user.id}`)
-      .then(res => res.json())
-      .then(data => {
+    const fetchConvs = async () => {
+      try {
+        const res = await fetch(`/api/conversations/${user.id}`);
+        const data = await res.json();
         if (Array.isArray(data)) {
           setConversations(data);
           if (targetContactId) {
-            const target = data.find(c => c.id === targetContactId);
+            const target = data.find(c => String(c.id) === String(targetContactId));
             if (target) {
               setSelectedConv(target);
             } else {
-              // If not in conversations yet, we might need to fetch the user info
-              fetch(`/api/admin/users`)
-                .then(res => res.json())
-                .then(users => {
-                  const userToChat = users.find((u: any) => u.id === targetContactId);
-                  if (userToChat) {
-                    setSelectedConv({ id: userToChat.id, name: userToChat.name });
-                  }
-                });
+              // Fetch user info for new conversation
+              const uRes = await fetch(`/api/admin/users/${targetContactId}`);
+              if (uRes.ok) {
+                const uData = await uRes.json();
+                setSelectedConv({ id: uData.id, name: uData.name });
+              }
             }
           } else if (data.length > 0 && !selectedConv) {
             setSelectedConv(data[0]);
           }
-        } else {
-          setConversations([]);
         }
-      });
+      } catch (err) {
+        console.error("Chat fetch error:", err);
+      }
+    };
+    fetchConvs();
+    
+    // Refresh interval for new messages
+    const interval = setInterval(fetchConvs, 10000);
+    return () => clearInterval(interval);
   }, [user.id, targetContactId]);
 
   useEffect(() => {
@@ -1548,22 +1656,31 @@ const ChatWindow = ({ user, targetContactId }: { user: User, targetContactId?: n
         </div>
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 && !selectedConv ? (
-            <div className="p-8 text-center text-zinc-400 text-sm">
-              Нет активных диалогов
+            <div className="flex flex-col items-center justify-center p-8 text-center h-full">
+              <div className="w-16 h-16 bg-white rounded-3xl shadow-sm flex items-center justify-center text-zinc-300 mb-4 border border-zinc-100">
+                <MessageSquare size={32} />
+              </div>
+              <p className="text-sm font-bold text-zinc-900 mb-2">Диалогов пока нет</p>
+              <p className="text-xs text-zinc-500 max-w-[200px] leading-relaxed">
+                Напишите поставщику в разделе "Поставщики" или сделайте заказ, чтобы начать общение.
+              </p>
             </div>
           ) : (
             <>
               {selectedConv && !conversations.find(c => String(c.id) === String(selectedConv.id)) && (
                 <button
                   onClick={() => setSelectedConv(selectedConv)}
-                  className="w-full p-4 flex gap-3 items-start bg-white border-l-4 border-l-emerald-600 border-b border-zinc-100/50"
+                  className="w-full p-4 flex gap-3 items-start bg-emerald-50/50 border-l-4 border-l-emerald-600 border-b border-zinc-100/50"
                 >
-                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex-shrink-0 flex items-center justify-center text-emerald-600 font-bold text-lg">
+                  <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex-shrink-0 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-emerald-200">
                     {selectedConv.name[0]}
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <p className="font-bold text-zinc-900 truncate">{selectedConv.name}</p>
-                    <p className="text-xs text-emerald-600 italic">Новый диалог</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                      <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Новый диалог</p>
+                    </div>
                   </div>
                 </button>
               )}
@@ -1571,16 +1688,18 @@ const ChatWindow = ({ user, targetContactId }: { user: User, targetContactId?: n
                 <button
                   key={conv.id}
                   onClick={() => setSelectedConv(conv)}
-                  className={`w-full p-4 flex gap-3 items-start hover:bg-white transition-all border-b border-zinc-100/50 ${
-                    selectedConv?.id === conv.id ? 'bg-white border-l-4 border-l-emerald-600' : ''
+                  className={`w-full p-4 flex gap-3 items-start hover:bg-white transition-all border-b border-zinc-100/50 group ${
+                    selectedConv?.id === conv.id ? 'bg-white border-l-4 border-l-emerald-600 shadow-sm' : ''
                   }`}
                 >
-                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex-shrink-0 flex items-center justify-center text-emerald-600 font-bold text-lg">
+                  <div className={`w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center font-bold text-lg transition-all ${
+                    selectedConv?.id === conv.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-zinc-100 text-zinc-400 group-hover:bg-zinc-200'
+                  }`}>
                     {conv.name[0]}
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <div className="flex justify-between items-baseline mb-1">
-                      <p className="font-bold text-zinc-900 truncate">{conv.name}</p>
+                      <p className={`font-bold transition-colors ${selectedConv?.id === conv.id ? 'text-zinc-900' : 'text-zinc-700'}`}>{conv.name}</p>
                       <span className="text-[10px] text-zinc-400 whitespace-nowrap">
                         {conv.last_message_time ? formatMoscowTime(conv.last_message_time) : ''}
                       </span>
@@ -2335,22 +2454,103 @@ const CatalogView = ({ user, onAddToCart }: { user: User, onAddToCart: (price: P
   );
 };
 
-const CartView = ({ cart, onUpdateQuantity, onRemove, onPlaceOrder }: { 
+const CartView = ({ cart, onUpdateQuantity, onRemove, onPlaceOrder, restaurantId }: { 
   cart: CartItem[], 
   onUpdateQuantity: (productName: string, supplierName: string, delta: number) => void,
   onRemove: (productName: string, supplierName: string) => void,
-  onPlaceOrder: () => void
+  onPlaceOrder: () => void,
+  restaurantId: number
 }) => {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'current' | 'history'>('current');
+
+  useEffect(() => {
+    if (activeSubTab === 'history') {
+      setLoadingOrders(true);
+      fetch(`/api/orders/restaurant/${restaurantId}`)
+        .then(res => res.json())
+        .then(data => {
+          setOrders(Array.isArray(data) ? data : []);
+          setLoadingOrders(false);
+        })
+        .catch(() => setLoadingOrders(false));
+    }
+  }, [activeSubTab, restaurantId]);
+
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
     <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
-        <div className="p-4 sm:p-6 border-b border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h2 className="font-bold text-zinc-900 text-lg sm:text-xl">Ваш заказ</h2>
-          <span className="text-xs sm:text-sm text-zinc-500 font-medium">{cart.length} позиций</span>
+      <div className="flex border-b border-zinc-100">
+        <button 
+          onClick={() => setActiveSubTab('current')}
+          className={`flex-1 py-4 text-sm font-bold transition-all ${activeSubTab === 'current' ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/30' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}
+        >
+          Текущая корзина ({cart.length})
+        </button>
+        <button 
+          onClick={() => setActiveSubTab('history')}
+          className={`flex-1 py-4 text-sm font-bold transition-all ${activeSubTab === 'history' ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/30' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}
+        >
+          История заказов
+        </button>
+      </div>
+
+      {activeSubTab === 'history' ? (
+        <div className="p-8">
+          {loadingOrders ? (
+            <div className="text-center py-12 text-zinc-400">Загрузка истории...</div>
+          ) : orders.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-zinc-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-zinc-300">
+                <FileText size={32} />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 mb-1">История заказов пуста</h3>
+              <p className="text-sm text-zinc-500">Здесь будут отображаться ваши прошлые заявки поставщикам.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {orders.map((order: any) => (
+                <div key={order.id} className="border border-zinc-100 rounded-2xl p-6 hover:shadow-md transition-all bg-zinc-50/30">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-[10px] font-black text-white bg-zinc-900 px-2 py-0.5 rounded uppercase tracking-tighter">Заказ #{order.id}</p>
+                        <span className="text-[10px] text-zinc-400 font-bold">{new Date(order.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <h4 className="font-bold text-zinc-900">{order.supplier}</h4>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-emerald-600 text-lg">{order.total} ₽</p>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 mb-4">
+                    {order.items && order.items.slice(0, 3).map((item: any, i: number) => (
+                      <div key={i} className="flex justify-between text-[11px] text-zinc-500">
+                        <span className="truncate pr-4">• {item.product_name}</span>
+                        <span className="shrink-0">{item.quantity} {item.unit || 'ед.'}</span>
+                      </div>
+                    ))}
+                    {order.items && order.items.length > 3 && (
+                      <p className="text-[10px] text-zinc-400 italic">и еще {order.items.length - 3} поз.</p>
+                    )}
+                  </div>
+                  <div className="pt-4 border-t border-zinc-100 flex justify-between items-center">
+                    <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-lg uppercase tracking-wider">Отправлено</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      
-      {cart.length === 0 ? (
+      ) : (
+        <>
+          <div className="p-4 sm:p-6 border-b border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h2 className="font-bold text-zinc-900 text-lg sm:text-xl">Ваш заказ</h2>
+            <span className="text-xs sm:text-sm text-zinc-500 font-medium">{cart.length} позиций</span>
+          </div>
+          {cart.length === 0 ? (
         <div className="p-20 text-center">
           <ShoppingCart size={64} className="mx-auto text-zinc-100 mb-6" />
           <p className="text-zinc-400 font-medium">Ваша корзина пуста</p>
@@ -2438,7 +2638,9 @@ const CartView = ({ cart, onUpdateQuantity, onRemove, onPlaceOrder }: {
           </div>
         </div>
       )}
-    </div>
+    </>
+  )}
+</div>
   );
 };
 
@@ -2737,6 +2939,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
 }) => {
   const [prices, setPrices] = useState<PriceRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [promotions, setPromotions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [seasonality, setSeasonality] = useState<{ month: string, products: string[] } | null>(null);
   const [monthlyEconomy, setMonthlyEconomy] = useState<number>(145200);
@@ -2745,22 +2948,36 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
   const [chatTargetId, setChatTargetId] = useState<number | null>(null);
+  const [isOrdering, setIsOrdering] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const pageSize = 20;
 
+  const [orders, setOrders] = useState<any[]>([]);
+
   const tabs = [
     { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
     { id: 'catalog', label: 'Каталог', icon: Package },
     { id: 'suppliers', label: 'Поставщики', icon: Users },
+    { id: 'orders_history', label: 'Заказы', icon: FileClock },
     { id: 'chat', label: 'Чат', icon: MessageSquare },
     { id: 'invoices', label: 'Бухгалтерия', icon: FileText },
-    { id: 'cart', label: `Заказ (${cart.length})`, icon: ShoppingCart },
+    { id: 'cart', label: `Корзина (${cart.length})`, icon: ShoppingCart },
     { id: 'integrations', label: 'Интеграции', icon: Zap },
     { id: 'settings', label: 'Настройки', icon: Settings },
   ];
+
+  const fetchOrders = useCallback(() => {
+    fetch(`/api/orders/restaurant/${user.id}`)
+      .then(res => res.json())
+      .then(data => setOrders(Array.isArray(data) ? data : []));
+  }, [user.id]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   useEffect(() => {
     if (requestedTab) {
@@ -2773,11 +2990,36 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
     fetch('/api/prices')
       .then(res => res.json())
       .then(setPrices);
+    fetch('/api/promotions')
+      .then(res => res.json())
+      .then(data => setPromotions(Array.isArray(data) ? data : []));
   }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const [showLanding, setShowLanding] = useState(false);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#about' || hash === '#pricing' || hash === '#suppliers' || hash === '#promotions' || hash === '') {
+        if (hash === '') {
+           if (!user) setShowLanding(true);
+           else setShowLanding(false);
+        } else {
+           setShowLanding(true);
+        }
+      } else {
+        setShowLanding(false);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange();
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [user]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -2866,6 +3108,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
 
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
+    setIsOrdering(true);
 
     // Group items by supplier
     const ordersBySupplier = cart.reduce((acc, item) => {
@@ -2920,6 +3163,8 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
     } catch (err) {
       console.error(err);
       showToast?.('Ошибка при оформлении заказа', 'error');
+    } finally {
+      setIsOrdering(false);
     }
   };
 
@@ -3080,55 +3325,90 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
               </div>
             </div>
 
-            {/* Recommendations */}
-            {recommendations.length > 0 && (
+            {/* Recommendations & Promotions */}
+            {(recommendations.length > 0 || promotions.length >= 0) && (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6"
               >
-                <h2 className="text-xl font-bold text-emerald-900 mb-6 flex items-center gap-2">
-                  <Zap className="text-emerald-600" size={24} /> Лучшие предложения для вас
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {recommendations.map((rec, i) => (
-                    <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-emerald-100 group hover:border-emerald-300 transition-all">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <p className="font-bold text-zinc-900 text-lg truncate max-w-[150px]" title={rec.product}>{rec.product}</p>
-                          <p className="text-sm text-zinc-500">Поставщик: <span className="text-emerald-600 font-semibold truncate inline-block max-w-[100px] align-bottom" title={rec.supplier}>{rec.supplier}</span></p>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-emerald-900 flex items-center gap-2">
+                    <Zap className="text-emerald-600" size={24} /> Лучшие предложения для вас
+                  </h2>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Real Supplier Promotions */}
+                  {promotions.length > 0 ? (
+                    promotions.slice(0, 3).map((promo, i) => (
+                      <div key={`promo-${promo.id}`} className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-emerald-100 group hover:border-emerald-300 transition-all relative overflow-hidden flex flex-col h-full">
+                        <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${promo.color || 'from-emerald-500 to-teal-400'}`} />
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-2.5 py-1 rounded-full uppercase tracking-tight">Акция</span>
+                          {promo.discount_percent && <span className="text-xs font-bold text-emerald-600">-{promo.discount_percent}%</span>}
                         </div>
-                        <span className="bg-emerald-50 text-emerald-600 text-xs font-bold px-2 py-1 rounded-lg">-{rec.savingsPercent}%</span>
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <div>
-                          <p className="text-xs text-zinc-400 line-through mb-1">{rec.currentPrice} ₽</p>
-                          <p className="text-2xl font-bold text-emerald-600">{rec.bestPrice} ₽</p>
+                        <h3 className="font-bold text-zinc-900 text-lg mb-1 leading-tight">{promo.title}</h3>
+                        <p className="text-[11px] text-zinc-400 mb-4">{promo.supplier_name}</p>
+                        <p className="text-xs text-zinc-500 line-clamp-2 mb-6 flex-1">{promo.description}</p>
+                        <div className="flex items-center justify-between mt-auto">
+                          <div>
+                             {promo.price && <p className="text-lg font-bold text-emerald-600">{promo.price} ₽</p>}
+                             <p className="text-[10px] text-zinc-400 font-medium">Спеццена</p>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setSelectedSupplierId(promo.supplier_id);
+                              setActiveTab('suppliers');
+                            }}
+                            className="bg-zinc-900 text-white text-[11px] font-bold px-4 py-2 rounded-xl hover:bg-zinc-800 transition-all shadow-md active:scale-95"
+                          >
+                            Детали
+                          </button>
                         </div>
-                        <button 
-                          onClick={() => {
-                            if (rec.supplier_id) {
-                              addToCart({
-                                product_name: rec.product,
-                                supplier_name: rec.supplier,
-                                supplier_id: rec.supplier_id,
-                                price: rec.bestPrice,
-                                category: 'Выгодное предложение',
-                                updated_at: new Date().toISOString()
-                              });
-                            } else {
-                              setSearchQuery(rec.product);
-                              document.getElementById('market-prices-section')?.scrollIntoView({ behavior: 'smooth' });
-                            }
-                          }}
-                          className="bg-emerald-600 text-white p-2 rounded-xl hover:bg-emerald-700 transition-all shadow-md active:scale-95"
-                          title="Добавить в корзину"
-                        >
-                          <ShoppingCart size={20} />
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    /* Fallback Mock/AI Recommendations */
+                    (recommendations.length > 0 ? recommendations : [
+                      { product: 'Креветки тигровые 16/20', supplier: 'Морской Бриз', bestPrice: 1200, currentPrice: 1550, savingsPercent: 22, supplier_id: 1 },
+                      { product: 'Масло сливочное 82.5%', supplier: 'Мироторг', bestPrice: 780, currentPrice: 940, savingsPercent: 17, supplier_id: 2 },
+                      { product: 'Томаты черри 250г', supplier: 'Эко-Ферма', bestPrice: 145, currentPrice: 190, savingsPercent: 24, supplier_id: 3 }
+                    ]).slice(0, 3).map((rec, i) => (
+                      <div key={`rec-${i}`} className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-emerald-100 group hover:border-emerald-300 transition-all flex flex-col h-full">
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-tight">Рекомендация</span>
+                          <span className="text-xs font-bold text-emerald-600">-{rec.savingsPercent}%</span>
+                        </div>
+                        <h3 className="font-bold text-zinc-900 text-lg mb-1 leading-tight">{rec.product}</h3>
+                        <p className="text-[11px] text-zinc-400 mb-4">{rec.supplier}</p>
+                        <p className="text-xs text-zinc-500 mb-6 flex-1">Мы нашли это предложение выгоднее вашего текущего поставщика на {rec.savingsPercent}%.</p>
+                        <div className="flex items-center justify-between mt-auto">
+                          <div>
+                            <p className="text-xs text-zinc-400 line-through">{rec.currentPrice} ₽</p>
+                            <p className="text-lg font-bold text-emerald-600">{rec.bestPrice} ₽</p>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              if (rec.supplier_id) {
+                                addToCart({
+                                  product_name: rec.product,
+                                  supplier_name: rec.supplier,
+                                  supplier_id: rec.supplier_id,
+                                  price: rec.bestPrice,
+                                  category: 'Выгодное предложение',
+                                  updated_at: new Date().toISOString()
+                                });
+                              }
+                            }}
+                            className="bg-emerald-600 text-white p-2.5 rounded-xl hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                          >
+                            <Plus size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}
@@ -3240,6 +3520,70 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
           </motion.div>
         )}
 
+        {activeTab === 'orders_history' && (
+          <motion.div 
+            key="orders_history"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-8"
+          >
+            <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-zinc-100">
+                <h2 className="text-xl font-bold text-zinc-900">История ваших заказов</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-zinc-50 text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+                      <th className="px-8 py-5">ID</th>
+                      <th className="px-8 py-5">Поставщик</th>
+                      <th className="px-8 py-5">Товары</th>
+                      <th className="px-8 py-5">Сумма</th>
+                      <th className="px-8 py-5">Дата</th>
+                      <th className="px-8 py-5">Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {orders.length > 0 ? orders.map((order) => (
+                      <tr key={order.id} className="hover:bg-zinc-50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-medium text-zinc-500">#{order.id}</td>
+                        <td className="px-8 py-5 font-bold text-zinc-900">{order.supplier_name}</td>
+                        <td className="px-8 py-5 text-xs text-zinc-500">
+                          <p className="truncate max-w-[200px]">
+                            {(() => {
+                              try {
+                                const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+                                return Array.isArray(items) ? items.map((it: any) => it.product_name).join(', ') : '';
+                              } catch(e) { return String(order.items); }
+                            })()}
+                          </p>
+                        </td>
+                        <td className="px-8 py-5 font-bold text-emerald-600">{order.total} ₽</td>
+                        <td className="px-8 py-5 text-xs text-zinc-400">{new Date(order.created_at).toLocaleDateString()}</td>
+                        <td className="px-8 py-5">
+                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
+                            order.status === 'new' ? 'bg-blue-50 text-blue-600' : 
+                            order.status === 'processing' ? 'bg-amber-50 text-amber-600' : 
+                            order.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-zinc-100 text-zinc-400'
+                          }`}>
+                            {order.status === 'new' ? 'Новый' : order.status === 'processing' ? 'В работе' : order.status === 'completed' ? 'Завершен' : order.status}
+                          </span>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={6} className="px-8 py-20 text-center text-zinc-400 italic">
+                          У вас пока нет оформленных заказов
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'chat' && (
           <motion.div 
             key="chat"
@@ -3285,6 +3629,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
               onUpdateQuantity={updateCartQuantity} 
               onRemove={removeFromCart}
               onPlaceOrder={handlePlaceOrder}
+              restaurantId={user.id}
             />
           </motion.div>
         )}
@@ -4555,11 +4900,12 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [stats, setStats] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [prices, setPrices] = useState<any[]>([]);
-  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'invoices' | 'prices' | 'settings'>('users');
+  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'invoices' | 'prices' | 'settings' | 'promotions'>('users');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedPrice, setSelectedPrice] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingPromos, setPendingPromos] = useState<any[]>([]);
   const [currentPageUsers, setCurrentPageUsers] = useState(1);
   const [currentPageInvoices, setCurrentPageInvoices] = useState(1);
   const [currentPagePrices, setCurrentPagePrices] = useState(1);
@@ -4570,6 +4916,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
     { id: 'users', label: 'Пользователи', icon: Users },
     { id: 'invoices', label: 'Накладные', icon: FileText },
     { id: 'prices', label: 'Прайс-листы', icon: Tag },
+    { id: 'promotions', label: 'Акции', icon: Zap },
     { id: 'settings', label: 'Настройки', icon: Settings },
   ];
 
@@ -4581,12 +4928,14 @@ const AdminDashboard = ({ user }: { user: User }) => {
       fetch('/api/admin/users').then(res => res.json()),
       fetch('/api/admin/stats').then(res => res.json()),
       fetch('/api/admin/invoices').then(res => res.json()),
-      fetch('/api/admin/prices').then(res => res.json())
-    ]).then(([usersData, statsData, invoicesData, pricesData]) => {
+      fetch('/api/admin/prices').then(res => res.json()),
+      fetch('/api/admin/promotions').then(res => res.json())
+    ]).then(([usersData, statsData, invoicesData, pricesData, promoData]) => {
       setUsers(usersData);
       setStats(statsData);
       setInvoices(invoicesData);
       setPrices(pricesData);
+      setPendingPromos(Array.isArray(promoData) ? promoData : []);
     }).finally(() => setIsLoading(false));
   };
 
@@ -4608,6 +4957,15 @@ const AdminDashboard = ({ user }: { user: User }) => {
 
   const updateInvoiceStatus = async (id: number, status: string) => {
     await fetch(`/api/admin/invoices/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    fetchData();
+  };
+
+  const handlePromoAction = async (id: number, status: 'approved' | 'rejected') => {
+    await fetch(`/api/admin/promotions/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
@@ -4948,6 +5306,56 @@ const AdminDashboard = ({ user }: { user: User }) => {
           </motion.div>
         )}
 
+        {activeAdminTab === 'promotions' && (
+          <motion.div 
+            key="promotions"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
+            <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+              <h2 className="text-xl font-bold text-zinc-900 mb-6">Модерация акций</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {pendingPromos.map((promo) => (
+                  <div key={promo.id} className="bg-white border border-zinc-200 rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col">
+                    <div className={`h-24 bg-gradient-to-br ${promo.color} p-6 flex items-end relative overflow-hidden`}>
+                      <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded capitalize">
+                        {promo.status}
+                      </div>
+                      <h3 className="text-white font-bold text-lg relative z-10">{promo.supplier_name}</h3>
+                    </div>
+                    <div className="p-6 flex-1 flex flex-col">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-bold text-zinc-900 text-base">{promo.title}</h4>
+                        {promo.discount_percent && <span className="text-emerald-600 font-bold text-xs">-{promo.discount_percent}%</span>}
+                      </div>
+                      <p className="text-zinc-500 text-xs leading-relaxed mb-4 flex-1 italic">{promo.description}</p>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handlePromoAction(promo.id, 'approved')}
+                          className="flex-1 bg-emerald-600 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-emerald-700 transition-all active:scale-95"
+                        >
+                          Одобрить
+                        </button>
+                        <button 
+                          onClick={() => handlePromoAction(promo.id, 'rejected')}
+                          className="flex-1 bg-rose-50 text-rose-600 text-xs font-bold py-2.5 rounded-xl hover:bg-rose-100 transition-all active:scale-95"
+                        >
+                          Отклонить
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {pendingPromos.length === 0 && (
+                  <div className="col-span-full py-20 text-center text-zinc-400">Нет акций для модерации</div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {activeAdminTab === 'settings' && (
           <SystemSettingsView />
         )}
@@ -4975,13 +5383,232 @@ const AdminDashboard = ({ user }: { user: User }) => {
   );
 };
 
+const PromotionsView = ({ supplierId, showToast }: { supplierId: number, showToast?: (m: string, t?: 'success'|'error') => void }) => {
+  const [promotions, setPromotions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newPromo, setNewPromo] = useState({
+    title: '',
+    product_name: '',
+    description: '',
+    price: '',
+    discount_percent: '',
+    color: 'from-emerald-500 to-teal-400'
+  });
+
+  const fetchPromotions = async () => {
+    try {
+      const res = await fetch(`/api/supplier/promotions/${supplierId}`);
+      const data = await res.json();
+      setPromotions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPromotions();
+  }, [supplierId]);
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/supplier/promotions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newPromo, supplier_id: supplierId })
+      });
+      if (res.ok) {
+        showToast?.('Акция успешно добавлена');
+        setIsAdding(false);
+        setNewPromo({ title: '', product_name: '', description: '', price: '', discount_percent: '', color: 'from-emerald-500 to-teal-400' });
+        fetchPromotions();
+      }
+    } catch (err) {
+      showToast?.('Ошибка при добавлении акции', 'error');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Удалить эту акцию?')) return;
+    try {
+      const res = await fetch(`/api/supplier/promotions/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast?.('Акция удалена');
+        fetchPromotions();
+      }
+    } catch (err) {
+      showToast?.('Ошибка при удалении', 'error');
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm transition-all hover:shadow-md">
+        <div>
+          <h2 className="text-2xl font-bold text-zinc-900">Ваши акции</h2>
+          <p className="text-zinc-500 text-sm">Управляйте спецпредложениями, которые видят рестораны</p>
+        </div>
+        <button 
+          onClick={() => setIsAdding(!isAdding)}
+          className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-lg shadow-emerald-100 active:scale-95"
+        >
+          {isAdding ? <X size={20} /> : <Plus size={20} />}
+          {isAdding ? 'Отмена' : 'Создать акцию'}
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {isAdding && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-xl"
+          >
+            <form onSubmit={handleAdd} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Заголовок акции</label>
+                  <input 
+                    required
+                    type="text" 
+                    value={newPromo.title}
+                    onChange={e => setNewPromo({...newPromo, title: e.target.value})}
+                    placeholder="Например: Скидка на морепродукты"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Товар (необязательно)</label>
+                  <input 
+                    type="text" 
+                    value={newPromo.product_name}
+                    onChange={e => setNewPromo({...newPromo, product_name: e.target.value})}
+                    placeholder="Например: Креветки тигровые"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Описание</label>
+                  <textarea 
+                    required
+                    value={newPromo.description}
+                    onChange={e => setNewPromo({...newPromo, description: e.target.value})}
+                    rows={3}
+                    placeholder="Опишите условия акции..."
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Цена (₽)</label>
+                  <input 
+                    type="number" 
+                    value={newPromo.price}
+                    onChange={e => setNewPromo({...newPromo, price: e.target.value})}
+                    placeholder="850"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Скидка (%)</label>
+                  <input 
+                    type="number" 
+                    value={newPromo.discount_percent}
+                    onChange={e => setNewPromo({...newPromo, discount_percent: e.target.value})}
+                    placeholder="15"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Цветовая схема</label>
+                  <div className="flex gap-4">
+                    {[
+                      'from-emerald-500 to-teal-400',
+                      'from-blue-500 to-indigo-500',
+                      'from-orange-500 to-amber-500',
+                      'from-rose-500 to-pink-500'
+                    ].map(c => (
+                      <button 
+                        key={c}
+                        type="button"
+                        onClick={() => setNewPromo({...newPromo, color: c})}
+                        className={`w-12 h-12 rounded-xl bg-gradient-to-br ${c} border-4 transition-all ${newPromo.color === c ? 'border-zinc-900 scale-110 shadow-lg' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button 
+                type="submit"
+                className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl active:scale-95"
+              >
+                Опубликовать акцию
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {promotions.map((promo) => (
+          <div key={promo.id} className="bg-white border border-zinc-200 rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col">
+            <div className={`h-32 bg-gradient-to-br ${promo.color} p-8 flex items-end relative overflow-hidden`}>
+              <div className="absolute top-4 right-4 flex gap-2">
+                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${
+                  promo.status === 'approved' ? 'bg-emerald-500/20 text-white' : 
+                  promo.status === 'rejected' ? 'bg-rose-500/20 text-white' : 
+                  'bg-white/20 text-white'
+                }`}>
+                  {promo.status === 'pending' ? 'На проверке' : 
+                   promo.status === 'approved' ? 'Опубликовано' : 'Отклонено'}
+                </span>
+                <button 
+                  onClick={() => handleDelete(promo.id)}
+                  className="bg-white/20 backdrop-blur-md text-white p-2 rounded-lg hover:bg-red-500 transition-all"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              <div className="absolute top-4 left-4 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">Акция</div>
+              <h3 className="text-white font-bold text-xl relative z-10">{promo.product_name || 'Спецпредложение'}</h3>
+            </div>
+            <div className="p-8 flex-1 flex flex-col">
+              <h4 className="font-bold text-zinc-900 text-lg mb-3">{promo.title}</h4>
+              <p className="text-zinc-500 text-sm leading-relaxed mb-6 flex-1">{promo.description}</p>
+              <div className="flex items-center justify-between mt-auto">
+                {promo.price && <p className="font-bold text-emerald-600 text-xl">{promo.price} ₽</p>}
+                {promo.discount_percent && <span className="text-xs font-black text-rose-500 bg-rose-50 px-2 py-1 rounded uppercase">-{promo.discount_percent}%</span>}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {!loading && promotions.length === 0 && !isAdding && (
+          <div className="col-span-full py-20 text-center bg-zinc-50 rounded-3xl border-2 border-dashed border-zinc-200">
+            <div className="w-16 h-16 bg-zinc-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-zinc-400">
+              <Zap size={32} />
+            </div>
+            <h3 className="text-zinc-900 font-bold mb-2">Объявите о своей акции</h3>
+            <p className="text-zinc-500 text-sm max-w-sm mx-auto">
+              Создайте первую акцию, чтобы привлечь внимание ресторанов. Она появится в рекомендациях на их главной странице.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: { 
   user: User, 
   requestedTab?: string | null, 
   onTabHandled?: () => void,
   showToast?: (m: string, t?: 'success' | 'error') => void
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat' | 'import' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'prices' | 'orders' | 'integrations' | 'chat' | 'import' | 'settings' | 'promotions'>('dashboard');
   const [integration, setIntegration] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [show1cPass, setShow1cPass] = useState(false);
@@ -5000,6 +5627,7 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
   const supplierTabs = [
     { id: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
     { id: 'prices', label: 'Прайс-листы', icon: Package },
+    { id: 'promotions', label: 'Акции', icon: Zap },
     { id: 'chat', label: 'Чат', icon: MessageSquare },
     { id: 'orders', label: 'Заказы', icon: FileText },
     { id: 'import', label: 'Импорт', icon: Download },
@@ -5222,80 +5850,109 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
         <div>
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && (
-          <motion.div 
-            key="dashboard"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-10"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="bg-white border border-zinc-200 rounded-3xl p-6">
-                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Всего заказов</p>
-                <p className="text-4xl font-bold text-zinc-900">{stats.orderCount}</p>
-              </div>
-              <div className="bg-white border border-zinc-200 rounded-3xl p-6 flex flex-col justify-between">
-                <div>
-                  <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Товаров в прайсе</p>
-                  <p className="text-4xl font-bold text-zinc-900">{stats.productCount}</p>
-                </div>
-                <button 
-                  onClick={() => setActiveTab('prices')}
-                  className="mt-4 flex items-center gap-2 text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-colors"
-                >
-                  Управление прайсом <ArrowRight size={16} />
-                </button>
-              </div>
-              <div className="bg-zinc-900 text-white rounded-3xl p-6">
-                <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Объем продаж</p>
-                <p className="text-4xl font-bold text-emerald-400">{stats.totalVolume.toLocaleString()} ₽</p>
-              </div>
-            </div>
+              <motion.div 
+                key="dashboard"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-10"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm transition-all hover:shadow-md">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
+                        <Package size={20} />
+                      </div>
+                      <span className="text-zinc-500 text-sm font-bold uppercase tracking-wider">Товары</span>
+                    </div>
+                    <p className="text-3xl font-black text-zinc-900">{stats.productCount}</p>
+                    <div className="mt-2 text-xs text-emerald-600 font-bold bg-emerald-50 inline-block px-2 py-1 rounded">В прайсе</div>
+                  </div>
+                  
+                  <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm transition-all hover:shadow-md">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
+                        <FileText size={20} />
+                      </div>
+                      <span className="text-zinc-500 text-sm font-bold uppercase tracking-wider">Заказы</span>
+                    </div>
+                    <p className="text-3xl font-black text-zinc-900">{orders.length}</p>
+                    <div className="mt-2 text-xs text-blue-600 font-bold bg-blue-50 inline-block px-2 py-1 rounded">Всего</div>
+                  </div>
 
-            <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <h2 className="text-xl font-bold text-zinc-900 mb-6">Последние уведомления</h2>
-                <div className="space-y-4">
+                  <div className="bg-zinc-900 p-6 rounded-3xl shadow-xl shadow-zinc-200 relative overflow-hidden group">
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-emerald-400">
+                          <TrendingUp size={20} />
+                        </div>
+                        <span className="text-zinc-400 text-sm font-bold uppercase tracking-wider">Выручка</span>
+                      </div>
+                      <p className="text-3xl font-black text-white">{stats.totalVolume.toLocaleString()} ₽</p>
+                      <div className="mt-2 text-xs text-emerald-400 font-bold">За все время</div>
+                    </div>
+                    <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl group-hover:bg-emerald-600/20 transition-all" />
+                  </div>
+
                   <div 
-                    onClick={() => setActiveTab('orders')}
-                    className="flex items-center gap-4 p-4 bg-zinc-50 rounded-2xl cursor-pointer hover:bg-zinc-100 transition-colors"
+                    onClick={() => setActiveTab('promotions')}
+                    className="bg-amber-50 p-6 rounded-3xl border border-amber-100 shadow-sm cursor-pointer hover:bg-amber-100 transition-all"
                   >
-                    <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-                      <ShoppingCart size={20} />
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-amber-600 shadow-sm">
+                        <Zap size={20} />
+                      </div>
+                      <span className="text-amber-700 text-sm font-bold uppercase tracking-wider">Акции</span>
                     </div>
-                    <div>
-                      <p className="font-bold text-zinc-900">Новые заказы</p>
-                      <p className="text-sm text-zinc-500">Проверьте вкладку заказов для обработки</p>
-                    </div>
+                    <p className="text-2xl font-black text-amber-900">Привлечь клиентов</p>
+                    <p className="mt-2 text-xs text-amber-600 font-bold">Настроить спецпредложения</p>
                   </div>
                 </div>
-              </div>
 
-              <div className="bg-zinc-900 text-white rounded-3xl p-8 flex flex-col justify-between">
-                <div>
-                  <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Статус интеграции 1С</p>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-3 h-3 rounded-full ${integration ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-                    <p className="text-2xl font-bold">{integration ? 'Подключено' : 'Не настроено'}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm">
+                    <h2 className="text-xl font-bold text-zinc-900 mb-6">Последние уведомления</h2>
+                    <div className="space-y-4">
+                      <div 
+                        onClick={() => setActiveTab('orders')}
+                        className="flex items-center gap-4 p-4 bg-zinc-50 rounded-2xl cursor-pointer hover:bg-zinc-100 transition-colors"
+                      >
+                        <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                          <ShoppingCart size={20} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-zinc-900">Новые заказы</p>
+                          <p className="text-sm text-zinc-500">Проверьте вкладку заказов для обработки</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-zinc-400 text-sm">
-                    {integration 
-                      ? `Последняя синхронизация: ${new Date(integration.last_sync).toLocaleString()}` 
-                      : 'Подключите 1С для автоматической выгрузки прайсов и заказов'}
-                  </p>
+
+                  <div className="bg-zinc-900 text-white rounded-3xl p-8 flex flex-col justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Статус интеграции 1С</p>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className={`w-3 h-3 rounded-full ${integration ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                        <p className="text-2xl font-bold">{integration ? 'Подключено' : 'Не настроено'}</p>
+                      </div>
+                      <p className="text-zinc-400 text-sm leading-relaxed">
+                        {integration 
+                          ? `Последняя синхронизация была успешно выполнена. Ваши данные в актуальном состоянии.` 
+                          : 'Подключите вашу учетную систему 1С для автоматической синхронизации остатков, цен и приема заказов.'}
+                      </p>
+                    </div>
+                    {!integration && (
+                      <button 
+                        onClick={() => setActiveTab('integrations')}
+                        className="mt-8 w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-900/20"
+                      >
+                        Настроить подключение
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {!integration && (
-                  <button 
-                    onClick={() => setActiveTab('integrations')}
-                    className="mt-6 w-full bg-white text-zinc-900 py-3 rounded-xl font-bold hover:bg-zinc-100 transition-all"
-                  >
-                    Настроить подключение
-                  </button>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
+              </motion.div>
+            )}
 
         {activeTab === 'prices' && (
           <motion.div 
@@ -5442,6 +6099,10 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
           >
             <SupplierImport user={user} showToast={showToast!} onImportSuccess={fetchPrices} />
           </motion.div>
+        )}
+
+        {activeTab === 'promotions' && (
+          <PromotionsView supplierId={user.id} showToast={showToast!} />
         )}
 
         {activeTab === 'orders' && (
@@ -5618,6 +6279,17 @@ const SupplierDashboard = ({ user, requestedTab, onTabHandled, showToast }: {
                 <SettingsView user={user} onUpdate={(u) => {}} showToast={showToast} />
               </motion.div>
             )}
+
+        {activeTab === 'promotions' && (
+          <motion.div 
+            key="promotions"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <PromotionsView supplierId={user.id} showToast={showToast} />
+          </motion.div>
+        )}
           </AnimatePresence>
         </div>
       </div>
@@ -6148,10 +6820,12 @@ export default function App() {
         onOpenFeedback={() => setIsFeedbackOpen(true)}
         notifications={notifications}
         onMarkRead={handleMarkRead}
+        onShowLanding={() => setShowLanding(true)}
         onNotificationClick={(type) => {
           if (type === 'chat') setRequestedTab('chat');
           if (type === 'price_alert') setRequestedTab('prices');
           if (type === 'order') setRequestedTab('orders');
+          setShowLanding(false);
         }}
       />
       
