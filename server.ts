@@ -175,7 +175,35 @@ db.exec(`
     error_message TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS seasonality (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    month INTEGER UNIQUE,
+    items TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
+
+// Seed seasonality if empty
+const seasonCount = db.prepare("SELECT COUNT(*) as count FROM seasonality").get() as any;
+if (seasonCount.count === 0) {
+  const monthsData = [
+    { m: 1, items: 'Мандарины, Помело, Авокадо' },
+    { m: 2, items: 'Грейпфруты, Киви, Груши' },
+    { m: 3, items: 'Зелень, Редис, Огурцы' },
+    { m: 4, items: 'Шпинат, Спаржа, Молодой чеснок' },
+    { m: 5, items: 'Клубника, Черешня, Кабачки' },
+    { m: 6, items: 'Земляника, Абрикосы, Малина' },
+    { m: 7, items: 'Черника, Смородина, Помидоры' },
+    { m: 8, items: 'Арбузы, Дыни, Персики' },
+    { m: 9, items: 'Тыква, Яблоки, Виноград' },
+    { m: 10, items: 'Хурма, Клюква, Опята' },
+    { m: 11, items: 'Фейхоа, Гранат, Капуста' },
+    { m: 12, items: 'Ананасы, Айва, Орехи' }
+  ];
+  const stmt = db.prepare("INSERT INTO seasonality (month, items) VALUES (?, ?)");
+  monthsData.forEach(m => stmt.run(m.m, m.items));
+}
 
 // Migration: Add current_price to restaurant_products if it doesn't exist
 try {
@@ -973,7 +1001,19 @@ async function startServer() {
         }
       };
 
-      const response = await fetchWithRetry();
+      let response;
+      try {
+        response = await fetchWithRetry();
+      } catch (err: any) {
+        console.error("Datanewton API inner error:", err.response?.data || err.message);
+        if (err.response?.status === 409) {
+          return res.json({ 
+            status: "not_found", 
+            message: "Сервис временно занят. Попробуйте позже или введите данные вручную." 
+          });
+        }
+        throw err;
+      }
 
       const result = response.data;
       console.log("Datanewton API Response for INN", cleanInn, ":", JSON.stringify(result, null, 2));
@@ -1459,10 +1499,13 @@ async function startServer() {
     }
   });
 
-  // --- Notifications API ---
+  // Notifications API
   app.get("/api/notifications/:userId", (req, res) => {
     try {
       const { userId } = req.params;
+      if (!userId || userId === 'undefined') {
+        return res.json([]);
+      }
       const notifications = db.prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50").all(userId);
       res.json(notifications);
     } catch (err) {
@@ -2343,34 +2386,54 @@ async function startServer() {
     try {
       // Safety check for valid restaurant_id
       let targetRestaurantId = restaurant_id;
+      if (!targetRestaurantId) {
+        console.warn("Order creation: missing restaurant_id, trying to recover...");
+      }
+      
       const userExists = db.prepare("SELECT id FROM users WHERE id = ?").get(targetRestaurantId);
       if (!userExists) {
         const firstUser = db.prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1").get() as any;
         targetRestaurantId = firstUser?.id || 1;
+        console.warn(`Order creation: restaurant_id ${restaurant_id} not found, using fallback ${targetRestaurantId}`);
       }
 
+      console.log(`Creating order record for restaurant ${targetRestaurantId} and supplier ${supplier_id}`);
       const info = db.prepare(`
-        INSERT INTO orders (restaurant_id, supplier_id, items, total)
-        VALUES (?, ?, ?, ?)
-      `).run(targetRestaurantId, supplier_id, JSON.stringify(items), total);
+        INSERT INTO orders (restaurant_id, supplier_id, items, total, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(targetRestaurantId, supplier_id, JSON.stringify(items), total, new Date().toISOString());
+      
       const orderId = info.lastInsertRowid;
+      console.log(`Order ${orderId} created successfully in database`);
 
-      // Notify restaurant
-      const restaurant = db.prepare("SELECT email FROM users WHERE id = ?").get(targetRestaurantId) as any;
-      if (restaurant?.email) {
-        sendEmail(restaurant.email, 'order_created', { order_id: orderId, total });
-      }
+      // Async background notifications (non-blocking)
+      const notifyAsync = async () => {
+        try {
+          console.log(`Starting background notifications for order ${orderId}`);
+          // Notify restaurant
+          const restaurant = db.prepare("SELECT email FROM users WHERE id = ?").get(targetRestaurantId) as any;
+          if (restaurant?.email) {
+            await sendEmail(restaurant.email, 'order_created', { order_id: orderId, total })
+              .catch(e => console.error(`[NOTIFIER] Order notification error (restaurant ${restaurant.email}):`, e.message));
+          }
 
-      // Notify supplier
-      const supplier = db.prepare("SELECT email FROM users WHERE id = ?").get(supplier_id) as any;
-      if (supplier?.email) {
-        sendEmail(supplier.email, 'order_created', { order_id: orderId, total });
-      }
-
+          // Notify supplier
+          const supplier = db.prepare("SELECT email FROM users WHERE id = ?").get(supplier_id) as any;
+          if (supplier?.email) {
+            await sendEmail(supplier.email, 'order_created', { order_id: orderId, total })
+              .catch(e => console.error(`[NOTIFIER] Order notification error (supplier ${supplier.email}):`, e.message));
+          }
+          console.log(`Background notifications process finished for order ${orderId}`);
+        } catch (notifierErr) {
+          console.error("Notifier background fatal error:", notifierErr);
+        }
+      };
+      
+      notifyAsync(); // Fire and forget
       res.json({ id: orderId, success: true });
-    } catch (err) {
-      console.error("Order creation error:", err);
-      res.status(500).json({ error: "Failed to create order" });
+    } catch (err: any) {
+      console.error("Order creation FATAL error:", err);
+      res.status(500).json({ error: "Failed to create order", details: err.message });
     }
   });
 
@@ -2427,6 +2490,31 @@ async function startServer() {
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch supplier stats" });
     }
+  });
+
+  // --- Seasonality API ---
+  app.get("/api/seasonality", (req, res) => {
+    try {
+      const data = db.prepare("SELECT * FROM seasonality ORDER BY month ASC").all();
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch seasonality" });
+    }
+  });
+
+  app.post("/api/seasonality", (req, res) => {
+    try {
+      const { month, items } = req.body;
+      db.prepare("INSERT OR REPLACE INTO seasonality (month, items, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)").run(month, items);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update seasonality" });
+    }
+  });
+
+  // API 404 handler - MUST BE BEFORE VITE MIDDLEWARE
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `API Route not found: ${req.method} ${req.url}` });
   });
 
   // Vite middleware for development (MUST BE AT THE END)

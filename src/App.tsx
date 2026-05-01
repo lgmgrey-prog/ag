@@ -47,7 +47,8 @@ import {
   Tag,
   Shield,
   ShieldCheck,
-  FileClock
+  FileClock,
+  CalendarRange
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail, Notification } from './types';
@@ -581,7 +582,7 @@ const LandingPromotions = () => {
           </div>
         </div>
 
-        <div id="landing-promo-slider" className="flex gap-6 overflow-x-auto pb-8 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory">
+        <div id="landing-promo-slider" className="flex gap-6 overflow-x-auto pb-10 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory">
           {displayedPromos.map((promo, i) => (
             <motion.div 
               key={promo.id || i}
@@ -589,23 +590,36 @@ const LandingPromotions = () => {
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.1 }}
               viewport={{ once: true }}
-              className="min-w-[300px] md:min-w-[380px] bg-white rounded-[2.5rem] p-6 shadow-sm border border-emerald-100 group hover:border-emerald-300 transition-all relative overflow-hidden flex flex-col h-[280px] snap-start"
+              className="min-w-[300px] md:min-w-[420px] bg-white rounded-[3rem] p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-emerald-100/50 group hover:border-emerald-300 transition-all relative overflow-hidden flex flex-col h-[400px] snap-start"
             >
-              <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${promo.color || 'from-emerald-500 to-teal-400'}`} />
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-2.5 py-1 rounded-full uppercase tracking-tight">Акция</span>
-                {promo.discount_percent && <span className="text-xs font-bold text-emerald-600">-{promo.discount_percent}%</span>}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-[4rem] -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500 opacity-50" />
+              
+              <div className="flex justify-between items-start mb-8 relative z-10">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full uppercase tracking-widest w-fit mb-3">Акция</span>
+                  <h4 className="text-[11px] text-zinc-400 font-bold uppercase tracking-[0.2em]">{promo.supplier_name}</h4>
+                </div>
+                {promo.discount_percent && (
+                  <div className="flex flex-col items-end">
+                    <span className="text-3xl font-black text-emerald-600 leading-tight">-{promo.discount_percent}%</span>
+                    <span className="text-[10px] text-emerald-400 font-black uppercase tracking-widest">Выгода</span>
+                  </div>
+                )}
               </div>
-              <h3 className="font-bold text-zinc-900 text-xl mb-1 leading-tight">{promo.title}</h3>
-              <p className="text-xs text-zinc-400 mb-4 font-bold">{promo.supplier_name}</p>
-              <p className="text-sm text-zinc-500 line-clamp-3 mb-6 flex-1 italic leading-relaxed">{promo.description}</p>
-              <div className="flex items-center justify-between mt-auto pt-4 border-t border-zinc-50">
-                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Действует сейчас</p>
+              
+              <h3 className="font-bold text-zinc-900 text-2xl mb-4 leading-[1.2] group-hover:text-emerald-600 transition-colors relative z-10 uppercase tracking-tight line-clamp-2">{promo.title}</h3>
+              <p className="text-sm text-zinc-500 line-clamp-3 italic leading-relaxed mb-8 font-medium flex-1 relative z-10">{promo.description}</p>
+              
+              <div className="flex items-center justify-between mt-auto pt-8 border-t border-zinc-100 relative z-10">
+                <div className="flex items-center gap-2.5 text-emerald-600 font-bold text-sm">
+                  <div className="w-2.5 h-2.5 bg-emerald-600 rounded-full animate-pulse shadow-[0_0_10px_rgba(5,150,105,0.4)]" />
+                  <span className="tracking-tight">Предложение активно</span>
+                </div>
                 <button 
-                   onClick={() => window.location.hash = '#suppliers'}
-                   className="text-xs font-bold text-emerald-600 hover:underline"
+                  onClick={() => window.location.hash = '#suppliers'}
+                  className="bg-zinc-900 text-white text-[10px] uppercase tracking-[0.2em] font-black px-8 py-4 rounded-2xl hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-200 transition-all active:scale-95 shadow-sm"
                 >
-                  Узнать больше
+                  Подробнее
                 </button>
               </div>
             </motion.div>
@@ -1586,7 +1600,7 @@ const ChatWindow = ({ user, targetContactId }: { user: User, targetContactId?: n
               setSelectedConv(target);
             } else {
               // Fetch user info for new conversation
-              const uRes = await fetch(`/api/admin/users/${targetContactId}`);
+              const uRes = await fetch(`/api/suppliers/${targetContactId}`);
               if (uRes.ok) {
                 const uData = await uRes.json();
                 setSelectedConv({ id: uData.id, name: uData.name });
@@ -2943,7 +2957,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const [loading, setLoading] = useState(false);
   const [seasonality, setSeasonality] = useState<{ month: string, products: string[] } | null>(null);
   const [monthlyEconomy, setMonthlyEconomy] = useState<number>(145200);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'invoices' | 'integrations' | 'cart' | 'suppliers' | 'settings' | 'catalog'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'invoices' | 'integrations' | 'cart' | 'suppliers' | 'settings' | 'catalog' | 'orders_history'>('dashboard');
   const [selectedPrice, setSelectedPrice] = useState<PriceRecord | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
@@ -2953,6 +2967,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const [currentPage, setCurrentPage] = useState(1);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [analysisPerformed, setAnalysisPerformed] = useState(false);
   const pageSize = 20;
 
   const [orders, setOrders] = useState<any[]>([]);
@@ -2970,10 +2985,15 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   ];
 
   const fetchOrders = useCallback(() => {
+    if (!user?.id) return;
     fetch(`/api/orders/restaurant/${user.id}`)
-      .then(res => res.json())
-      .then(data => setOrders(Array.isArray(data) ? data : []));
-  }, [user.id]);
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
+      .then(data => setOrders(Array.isArray(data) ? data : []))
+      .catch(err => console.error("Fetch orders error:", err));
+  }, [user?.id]);
 
   useEffect(() => {
     fetchOrders();
@@ -3024,7 +3044,20 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   const fetchStats = useCallback(async () => {
     try {
       const sRes = await fetch('/api/seasonality');
-      if (sRes.ok) setSeasonality(await sRes.json());
+      if (sRes.ok) {
+        const data = await sRes.json();
+        if (Array.isArray(data)) {
+          const currentMonth = new Date().getMonth() + 1;
+          const current = data.find((d: any) => d.month === currentMonth);
+          if (current) {
+            const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+            setSeasonality({
+              month: monthNames[currentMonth - 1],
+              products: current.items ? current.items.split(',').map((s: string) => s.trim()) : []
+            });
+          }
+        }
+      }
       const eRes = await fetch(`/api/stats/economy/${user.id}`);
       if (eRes.ok) setMonthlyEconomy((await eRes.json()).monthly_economy);
     } catch (e) {
@@ -3056,6 +3089,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
 
       const result = await analyzePrices(matrix, prices);
       setRecommendations(result.recommendations || []);
+      setAnalysisPerformed(true);
       if ((result.recommendations || []).length === 0) {
         showToast?.('Анализ завершен. На данный момент у вас оптимальные цены.');
       }
@@ -3121,10 +3155,9 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
       for (const supplierId in ordersBySupplier) {
         const items = ordersBySupplier[supplierId];
         const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        const supplierName = items[0].supplier_name;
         
         // 1. Create order record
-        await fetch('/api/orders', {
+        const orderRes = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3135,12 +3168,17 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
           })
         });
 
-        // 2. Send message to supplier chat
+        if (!orderRes.ok) {
+          const errorData = await orderRes.json();
+          throw new Error(errorData.error || 'Ошибка при сохранении заказа на сервере');
+        }
+
+        // 2. Send message to supplier chat (non-blocking for the process)
         const messageContent = `Заявка от "${user.name}":\n\n` + 
           items.map(item => `• ${item.product_name} (${item.quantity} ${item.unit || 'ед.'}) — ${item.price} ₽`).join('\n') +
           `\n\nИтого: ${total} ₽`;
 
-        await fetch('/api/messages', {
+        fetch('/api/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3148,18 +3186,28 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             receiver_id: parseInt(supplierId),
             content: messageContent
           })
-        });
+        }).catch(e => console.error("Chat notification error:", e));
       }
 
+      // Important: refresh orders immediately
+      fetchOrders();
+      
       showToast?.('Заказ успешно оформлен! Заявки отправлены поставщикам в чат.');
       setCart([]);
       
       // Set the last messaged supplier as the active chat target
-      const lastSupplierId = Object.keys(ordersBySupplier).pop();
+      const supplierIds = Object.keys(ordersBySupplier);
+      const lastSupplierId = supplierIds[supplierIds.length - 1];
+      
       if (lastSupplierId) {
         setChatTargetId(parseInt(lastSupplierId));
+        // Small delay to ensure DB processed the messages before switching tab
+        setTimeout(() => {
+          setActiveTab('chat');
+        }, 300);
+      } else {
+        setActiveTab('orders_history');
       }
-      setActiveTab('chat'); 
     } catch (err) {
       console.error(err);
       showToast?.('Ошибка при оформлении заказа', 'error');
@@ -3326,92 +3374,89 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
             </div>
 
             {/* Recommendations & Promotions */}
-            {(recommendations.length > 0 || promotions.length >= 0) && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6"
-              >
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold text-emerald-900 flex items-center gap-2">
-                    <Zap className="text-emerald-600" size={24} /> Лучшие предложения для вас
+            <div className="bg-emerald-50/50 border border-emerald-100/50 rounded-[3rem] p-8 sm:p-10 mb-8">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-zinc-900 flex items-center gap-3 tracking-tight">
+                    <Zap className="text-emerald-600 fill-emerald-600" size={28} /> Лучшие предложения
                   </h2>
+                  <p className="text-sm sm:text-base text-zinc-500 mt-2 font-medium italic">Персональные скидки от ваших поставщиков и новинки рынка</p>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Real Supplier Promotions */}
-                  {promotions.length > 0 ? (
-                    promotions.slice(0, 3).map((promo, i) => (
-                      <div key={`promo-${promo.id}`} className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-emerald-100 group hover:border-emerald-300 transition-all relative overflow-hidden flex flex-col h-full">
-                        <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${promo.color || 'from-emerald-500 to-teal-400'}`} />
-                        <div className="flex justify-between items-start mb-3">
-                          <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-2.5 py-1 rounded-full uppercase tracking-tight">Акция</span>
-                          {promo.discount_percent && <span className="text-xs font-bold text-emerald-600">-{promo.discount_percent}%</span>}
-                        </div>
-                        <h3 className="font-bold text-zinc-900 text-lg mb-1 leading-tight">{promo.title}</h3>
-                        <p className="text-[11px] text-zinc-400 mb-4">{promo.supplier_name}</p>
-                        <p className="text-xs text-zinc-500 line-clamp-2 mb-6 flex-1">{promo.description}</p>
-                        <div className="flex items-center justify-between mt-auto">
-                          <div>
-                             {promo.price && <p className="text-lg font-bold text-emerald-600">{promo.price} ₽</p>}
-                             <p className="text-[10px] text-zinc-400 font-medium">Спеццена</p>
-                          </div>
-                          <button 
-                            onClick={() => {
-                              setSelectedSupplierId(promo.supplier_id);
-                              setActiveTab('suppliers');
-                            }}
-                            className="bg-zinc-900 text-white text-[11px] font-bold px-4 py-2 rounded-xl hover:bg-zinc-800 transition-all shadow-md active:scale-95"
-                          >
-                            Детали
-                          </button>
-                        </div>
+                <button 
+                  onClick={handleAnalyze}
+                  disabled={loading}
+                  className="bg-emerald-600 text-white px-8 py-4 rounded-[1.2rem] font-bold text-sm hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 active:scale-95 disabled:opacity-50 flex items-center gap-3"
+                >
+                  {loading ? <RefreshCw size={18} className="animate-spin" /> : <RefreshCw size={18} />} 
+                  Обновить рекомендации
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {promotions.length > 0 && promotions.slice(0, 3).map((promo, i) => (
+                  <div key={`promo-${promo.id}`} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-emerald-100 hover:border-emerald-300 transition-all flex flex-col h-full group relative overflow-hidden">
+                    <div className="flex justify-between items-start mb-6">
+                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full uppercase tracking-widest">Акция</span>
+                      {promo.discount_percent && <span className="text-2xl font-black text-emerald-600">-{promo.discount_percent}%</span>}
+                    </div>
+                    <h3 className="font-bold text-zinc-900 text-lg mb-2 leading-tight group-hover:text-emerald-600 transition-colors uppercase tracking-tight">{promo.title}</h3>
+                    <p className="text-[10px] text-zinc-400 mb-4 font-bold uppercase tracking-[0.2em]">{promo.supplier_name}</p>
+                    <p className="text-xs text-zinc-500 line-clamp-3 mb-8 font-medium italic leading-relaxed flex-1">{promo.description}</p>
+                    <div className="flex items-center justify-between mt-auto pt-6 border-t border-zinc-100">
+                      <div>
+                         {promo.price && <p className="text-xl font-black text-emerald-600">{promo.price} ₽</p>}
+                         <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest leading-none mt-1">Спеццена</p>
                       </div>
-                    ))
-                  ) : (
-                    /* Fallback Mock/AI Recommendations */
-                    (recommendations.length > 0 ? recommendations : [
-                      { product: 'Креветки тигровые 16/20', supplier: 'Морской Бриз', bestPrice: 1200, currentPrice: 1550, savingsPercent: 22, supplier_id: 1 },
-                      { product: 'Масло сливочное 82.5%', supplier: 'Мироторг', bestPrice: 780, currentPrice: 940, savingsPercent: 17, supplier_id: 2 },
-                      { product: 'Томаты черри 250г', supplier: 'Эко-Ферма', bestPrice: 145, currentPrice: 190, savingsPercent: 24, supplier_id: 3 }
-                    ]).slice(0, 3).map((rec, i) => (
-                      <div key={`rec-${i}`} className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-emerald-100 group hover:border-emerald-300 transition-all flex flex-col h-full">
-                        <div className="flex justify-between items-start mb-3">
-                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-tight">Рекомендация</span>
-                          <span className="text-xs font-bold text-emerald-600">-{rec.savingsPercent}%</span>
-                        </div>
-                        <h3 className="font-bold text-zinc-900 text-lg mb-1 leading-tight">{rec.product}</h3>
-                        <p className="text-[11px] text-zinc-400 mb-4">{rec.supplier}</p>
-                        <p className="text-xs text-zinc-500 mb-6 flex-1">Мы нашли это предложение выгоднее вашего текущего поставщика на {rec.savingsPercent}%.</p>
-                        <div className="flex items-center justify-between mt-auto">
-                          <div>
-                            <p className="text-xs text-zinc-400 line-through">{rec.currentPrice} ₽</p>
-                            <p className="text-lg font-bold text-emerald-600">{rec.bestPrice} ₽</p>
-                          </div>
-                          <button 
-                            onClick={() => {
-                              if (rec.supplier_id) {
-                                addToCart({
-                                  product_name: rec.product,
-                                  supplier_name: rec.supplier,
-                                  supplier_id: rec.supplier_id,
-                                  price: rec.bestPrice,
-                                  category: 'Выгодное предложение',
-                                  updated_at: new Date().toISOString()
-                                });
-                              }
-                            }}
-                            className="bg-emerald-600 text-white p-2.5 rounded-xl hover:bg-emerald-700 transition-all shadow-md active:scale-95"
-                          >
-                            <Plus size={18} />
-                          </button>
-                        </div>
+                      <button 
+                        onClick={() => {
+                          setSelectedSupplierId(promo.supplier_id);
+                          setActiveTab('suppliers');
+                        }}
+                        className="bg-zinc-900 text-white text-[10px] font-black px-6 py-3 rounded-xl hover:bg-emerald-600 transition-all active:scale-95 uppercase tracking-widest shadow-sm"
+                      >
+                        Открыть
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {recommendations.slice(0, 3).map((rec, i) => (
+                  <div key={`rec-${i}`} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-emerald-100 hover:border-emerald-300 transition-all flex flex-col h-full group relative overflow-hidden">
+                    <div className="flex justify-between items-start mb-6">
+                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full uppercase tracking-widest">Совет</span>
+                      <span className="text-lg font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-xl">-{rec.savingsPercent}%</span>
+                    </div>
+                    <h3 className="font-bold text-zinc-900 text-lg mb-2 leading-tight group-hover:text-emerald-600 transition-colors uppercase tracking-tight">{rec.product}</h3>
+                    <p className="text-[10px] text-zinc-400 mb-4 font-bold uppercase tracking-[0.2em]">{rec.supplier}</p>
+                    <p className="text-xs text-zinc-500 mb-8 font-medium italic leading-relaxed flex-1">Выгода {rec.savingsPercent}% по сравнению с вашим текущим прайсом.</p>
+                    <div className="flex items-center justify-between mt-auto pt-6 border-t border-zinc-50">
+                      <div>
+                        <p className="text-xs text-zinc-300 line-through font-bold mb-0.5">{rec.currentPrice} ₽</p>
+                        <p className="text-xl font-black text-emerald-600">{rec.bestPrice} ₽</p>
                       </div>
-                    ))
-                  )}
-                </div>
-              </motion.div>
-            )}
+                      <button 
+                        onClick={() => {
+                          if (rec.supplier_id) {
+                            addToCart({
+                              product_name: rec.product,
+                              supplier_name: rec.supplier,
+                              supplier_id: rec.supplier_id,
+                              price: rec.bestPrice,
+                              category: 'Выгодное предложение',
+                              updated_at: new Date().toISOString(),
+                              unit: 'кг'
+                            });
+                          }
+                        }}
+                        className="bg-emerald-600 text-white p-3.5 rounded-xl hover:bg-emerald-700 transition-all active:scale-95 shadow-md shadow-emerald-100"
+                      >
+                        <Plus size={20} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* Price Table */}
             <div id="market-prices-section" className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
@@ -3547,7 +3592,7 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
                     {orders.length > 0 ? orders.map((order) => (
                       <tr key={order.id} className="hover:bg-zinc-50 transition-colors">
                         <td className="px-8 py-5 text-sm font-medium text-zinc-500">#{order.id}</td>
-                        <td className="px-8 py-5 font-bold text-zinc-900">{order.supplier_name}</td>
+                        <td className="px-8 py-5 font-bold text-zinc-900">{order.supplier}</td>
                         <td className="px-8 py-5 text-xs text-zinc-500">
                           <p className="truncate max-w-[200px]">
                             {(() => {
@@ -3716,6 +3761,120 @@ const RestaurantDashboard = ({ user, requestedTab, onTabHandled, showToast, onPa
   />
 </div>
 );
+};
+
+const SeasonalityManager = () => {
+  const [seasonalityData, setSeasonalityData] = useState<any[]>(
+    Array.from({ length: 12 }, (_, i) => ({ month: i + 1, items: '' }))
+  );
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+
+  const fetchData = useCallback(() => {
+    setLoading(true);
+    fetch('/api/seasonality')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const fullData = Array.from({ length: 12 }, (_, i) => {
+            const month = i + 1;
+            const existing = data.find(d => d.month === month);
+            return existing || { month, items: '' };
+          });
+          setSeasonalityData(fullData);
+        }
+      })
+      .catch(err => {
+        console.error('Fetch seasonality error:', err);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const saveSeasonality = async (month: number, items: string) => {
+    try {
+      const res = await fetch('/api/seasonality', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month, items })
+      });
+      if (res.ok) {
+        setMessage({ text: 'Сохранено', type: 'success' });
+        setTimeout(() => setMessage(null), 3000);
+        // Update local state without full reload
+        setSeasonalityData(prev => prev.map(d => d.month === month ? { ...d, items } : d));
+      } else {
+        throw new Error('Failed to save');
+      }
+    } catch (err) {
+      setMessage({ text: 'Ошибка сохранения', type: 'error' });
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white border border-zinc-200 rounded-3xl p-4 sm:p-8 shadow-sm space-y-6"
+    >
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
+            <CalendarRange size={24} className="text-emerald-500" />
+            Управление сезонностью
+          </h3>
+          <p className="text-sm text-zinc-500 mt-1">Введите товары через запятую для каждого месяца</p>
+        </div>
+        {loading && (
+          <div className="text-[10px] font-bold text-zinc-400 animate-pulse">Загрузка...</div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {message && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className={`p-4 rounded-xl text-sm font-bold flex items-center gap-2 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
+          >
+            {message.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {seasonalityData.map((item) => (
+          <div key={item.month} className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex gap-4 items-center">
+            <div className="w-10 h-10 bg-white rounded-xl border border-zinc-200 flex items-center justify-center font-black text-emerald-600 shadow-sm shrink-0">
+              {item.month}
+            </div>
+            <div className="flex-1 min-w-0">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1 block">
+                {['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'][item.month - 1]}
+              </label>
+              <input 
+                type="text"
+                value={item.items}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSeasonalityData(prev => prev.map(d => d.month === item.month ? { ...d, items: val } : d));
+                }}
+                onBlur={(e) => {
+                  saveSeasonality(item.month, e.target.value);
+                }}
+                className="w-full px-3 py-1.5 bg-white border border-zinc-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm font-medium"
+                placeholder="Напр: Клубника, Малина..."
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
 };
 
 const SystemSettingsView = () => {
@@ -4900,7 +5059,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [stats, setStats] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [prices, setPrices] = useState<any[]>([]);
-  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'invoices' | 'prices' | 'settings' | 'promotions'>('users');
+  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'invoices' | 'prices' | 'settings' | 'promotions' | 'season'>('users');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedPrice, setSelectedPrice] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -4917,6 +5076,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
     { id: 'invoices', label: 'Накладные', icon: FileText },
     { id: 'prices', label: 'Прайс-листы', icon: Tag },
     { id: 'promotions', label: 'Акции', icon: Zap },
+    { id: 'season', label: 'Сезонность', icon: CalendarRange },
     { id: 'settings', label: 'Настройки', icon: Settings },
   ];
 
@@ -5360,6 +5520,10 @@ const AdminDashboard = ({ user }: { user: User }) => {
           <SystemSettingsView />
         )}
 
+        {activeAdminTab === 'season' && (
+          <SeasonalityManager />
+        )}
+
       </AnimatePresence>
 
       <AnimatePresence>
@@ -5554,43 +5718,46 @@ const PromotionsView = ({ supplierId, showToast }: { supplierId: number, showToa
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {promotions.map((promo) => (
-          <div key={promo.id} className="bg-white border border-zinc-200 rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col">
-            <div className={`h-32 bg-gradient-to-br ${promo.color} p-8 flex items-end relative overflow-hidden`}>
-              <div className="absolute top-4 right-4 flex gap-2">
-                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${
-                  promo.status === 'approved' ? 'bg-emerald-500/20 text-white' : 
-                  promo.status === 'rejected' ? 'bg-rose-500/20 text-white' : 
-                  'bg-white/20 text-white'
+          <div key={promo.id} className="bg-white border border-emerald-100 rounded-[2.5rem] p-6 shadow-sm hover:shadow-xl transition-all group flex flex-col relative overflow-hidden">
+            <div className="flex justify-between items-start mb-3 relative z-10">
+              <div className="flex gap-2">
+                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-tight">Акция</span>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  promo.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 
+                  promo.status === 'rejected' ? 'bg-rose-100 text-rose-700' : 
+                  'bg-zinc-100 text-zinc-700'
                 }`}>
                   {promo.status === 'pending' ? 'На проверке' : 
                    promo.status === 'approved' ? 'Опубликовано' : 'Отклонено'}
                 </span>
-                <button 
-                  onClick={() => handleDelete(promo.id)}
-                  className="bg-white/20 backdrop-blur-md text-white p-2 rounded-lg hover:bg-red-500 transition-all"
-                >
-                  <Trash2 size={16} />
-                </button>
               </div>
-              <div className="absolute top-4 left-4 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">Акция</div>
-              <h3 className="text-white font-bold text-xl relative z-10">{promo.product_name || 'Спецпредложение'}</h3>
+              <button 
+                onClick={() => handleDelete(promo.id)}
+                className="text-zinc-300 hover:text-rose-500 transition-all active:scale-90"
+              >
+                <Trash2 size={18} />
+              </button>
             </div>
-            <div className="p-8 flex-1 flex flex-col">
-              <h4 className="font-bold text-zinc-900 text-lg mb-3">{promo.title}</h4>
-              <p className="text-zinc-500 text-sm leading-relaxed mb-6 flex-1">{promo.description}</p>
-              <div className="flex items-center justify-between mt-auto">
-                {promo.price && <p className="font-bold text-emerald-600 text-xl">{promo.price} ₽</p>}
-                {promo.discount_percent && <span className="text-xs font-black text-rose-500 bg-rose-50 px-2 py-1 rounded uppercase">-{promo.discount_percent}%</span>}
+            
+            <h3 className="font-bold text-zinc-900 text-lg mb-1 leading-tight">{promo.product_name || 'Спецпредложение'}</h3>
+            <h4 className="font-bold text-zinc-900 text-base mb-2">{promo.title}</h4>
+            <p className="text-xs text-zinc-500 line-clamp-3 mb-6 flex-1 italic leading-relaxed">{promo.description}</p>
+            
+            <div className="flex items-center justify-between mt-auto pt-4 border-t border-zinc-50">
+              <div>
+                 {promo.price && <p className="text-lg font-bold text-emerald-600">{promo.price} ₽</p>}
+                 <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">Спеццена</p>
               </div>
+              {promo.discount_percent && (
+                <span className="text-xs font-black text-rose-500 bg-rose-50 px-2 py-1 rounded uppercase tracking-tighter">-{promo.discount_percent}%</span>
+              )}
             </div>
           </div>
         ))}
 
         {!loading && promotions.length === 0 && !isAdding && (
-          <div className="col-span-full py-20 text-center bg-zinc-50 rounded-3xl border-2 border-dashed border-zinc-200">
-            <div className="w-16 h-16 bg-zinc-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-zinc-400">
-              <Zap size={32} />
-            </div>
+          <div className="col-span-full py-20 text-center bg-zinc-50 rounded-[2.5rem] border border-dashed border-zinc-200">
+            <Zap className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
             <h3 className="text-zinc-900 font-bold mb-2">Объявите о своей акции</h3>
             <p className="text-zinc-500 text-sm max-w-sm mx-auto">
               Создайте первую акцию, чтобы привлечь внимание ресторанов. Она появится в рекомендациях на их главной странице.
@@ -6447,13 +6614,18 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
       
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Ошибка при проверке ИНН');
+        // Allow proceeding with unknown organization
+        setOrgName('Новая организация');
+        setVerificationStep('confirm');
+        return;
       }
       
       setOrgName(data.name || 'Организация найдена');
       setVerificationStep('confirm');
     } catch (err: any) {
-      setError(err.message || 'Не удалось найти организацию по этому ИНН');
+      // Allow proceeding even if API is down
+      setOrgName('Новая организация');
+      setVerificationStep('confirm');
     } finally {
       setIsVerifying(false);
     }
@@ -6546,6 +6718,11 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
               <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Ваша организация:</p>
               <p className="text-lg font-bold text-zinc-900">{orgName}</p>
               <p className="text-sm text-zinc-500 mt-1">ИНН: {inn}</p>
+              {orgName === 'Новая организация' && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-[11px] text-blue-600 leading-relaxed italic">
+                  Мы не смогли получить данные по этому ИНН автоматически из-за ошибки сервиса или отсутствия компании в реестре. Вы можете ввести название вручную на следующем шаге.
+                </div>
+              )}
             </div>
             
             <div className="flex flex-col gap-3">
@@ -6736,16 +6913,19 @@ export default function App() {
   }, []);
 
   const fetchNotifications = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       const res = await fetch(`/api/notifications/${user.id}`);
       if (res.ok) {
-        setNotifications(await res.json());
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setNotifications(data);
+        }
       }
     } catch (err) {
       console.error('Fetch notifications error:', err);
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (user) {
