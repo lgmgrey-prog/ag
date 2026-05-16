@@ -602,8 +602,8 @@ async function startServer() {
     }
   });
 
-  /* 
-  // HTTPS Redirect Middleware - Disabled for initial setup to avoid ERR_TUNNEL_CONNECTION_FAILED
+  // HTTPS Redirect Middleware - Forwarded for Nginx
+  app.set('trust proxy', 1);
   app.use((req, res, next) => {
     const host = req.headers.host || '';
     const xForwardedProto = req.headers['x-forwarded-proto'];
@@ -613,12 +613,10 @@ async function startServer() {
         !host.includes('127.0.0.1') && 
         !host.includes('.run.app') && 
         !host.includes('googleusercontent.com')) {
-      console.log(`[DEBUG] Redirecting to HTTPS: ${host}${req.url}`);
       return res.redirect(308, `https://${host}${req.url}`);
     }
     next();
   });
-  */
 
   app.use(express.json({ limit: '10mb' }));
 
