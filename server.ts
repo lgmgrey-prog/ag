@@ -519,9 +519,9 @@ async function startServer() {
 
   // 1. GLOBAL DEBUG & LOGGING (FIRST)
   app.use((req, res, next) => {
-    res.setHeader('X-Server-Version', '1.8.0');
+    res.setHeader('X-Server-Version', '1.8.1');
     if (req.url.startsWith('/api')) {
-      console.log(`[API v1.8.0] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+      console.log(`[API v1.8.1] ${req.method} ${req.url} - ${new Date().toISOString()}`);
     }
     next();
   });
@@ -602,22 +602,23 @@ async function startServer() {
     }
   });
 
-  // HTTPS Redirect Middleware
+  /* 
+  // HTTPS Redirect Middleware - Disabled for initial setup to avoid ERR_TUNNEL_CONNECTION_FAILED
   app.use((req, res, next) => {
     const host = req.headers.host || '';
     const xForwardedProto = req.headers['x-forwarded-proto'];
     
-    // Перенаправляем на https только если мы не на localhost и не в превью AI Studio
     if (xForwardedProto === 'http' && 
         !host.includes('localhost') && 
         !host.includes('127.0.0.1') && 
         !host.includes('.run.app') && 
         !host.includes('googleusercontent.com')) {
-      console.log(`[DEBUG] Redirecting to HTTPS: ${host}${req.url} (Method: ${req.method})`);
+      console.log(`[DEBUG] Redirecting to HTTPS: ${host}${req.url}`);
       return res.redirect(308, `https://${host}${req.url}`);
     }
     next();
   });
+  */
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -2539,12 +2540,23 @@ async function startServer() {
       }
     });
   } else {
-    const distPath = path.resolve(__dirname, "dist");
+    // When running bundled server from dist/server.cjs, __dirname is already dist/
+    // We check if we are inside dist or one level above
+    const currentDir = process.cwd();
+    let distPath = path.resolve(currentDir, "dist");
+    
+    // If we're executing from within the dist folder already
+    if (__dirname.endsWith('dist') || fs.existsSync(path.join(__dirname, 'index.html'))) {
+      distPath = __dirname;
+    }
+    
     const indexPath = path.join(distPath, "index.html");
     
     console.log("Starting in PRODUCTION mode");
-    console.log(`[DEBUG] Static files path: ${distPath}`);
-    console.log(`[DEBUG] Index HTML path: ${indexPath}`);
+    console.log(`[DEBUG] Current Dir: ${currentDir}`);
+    console.log(`[DEBUG] __dirname: ${__dirname}`);
+    console.log(`[DEBUG] Static files target: ${distPath}`);
+    console.log(`[DEBUG] Index HTML target: ${indexPath}`);
 
     if (!fs.existsSync(distPath)) {
       console.error(`[ERROR] Directory not found: ${distPath}. Did you run 'npm run build'?`);
