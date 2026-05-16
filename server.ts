@@ -18,8 +18,8 @@ import { google } from "googleapis";
 import cookieSession from "cookie-session";
 import xlsx from "xlsx";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const appFilename = typeof import.meta !== 'undefined' && import.meta.url ? fileURLToPath(import.meta.url) : (typeof __filename !== 'undefined' ? __filename : '');
+const appDirname = typeof import.meta !== 'undefined' && import.meta.url ? path.dirname(appFilename) : (typeof __dirname !== 'undefined' ? __dirname : '');
 
 const db = new Database("database.sqlite");
 db.exec("PRAGMA foreign_keys = ON;");
@@ -2532,7 +2532,7 @@ async function startServer() {
     app.get("*", async (req, res, next) => {
       if (req.url.startsWith('/api')) return next();
       try {
-        const html = await fs.readFileSync(path.join(__dirname, "index.html"), "utf-8");
+        const html = await fs.readFileSync(path.join(appDirname, "index.html"), "utf-8");
         const transformedHtml = await vite.transformIndexHtml(req.url, html);
         res.status(200).set({ "Content-Type": "text/html" }).end(transformedHtml);
       } catch (e) {
@@ -2540,21 +2540,21 @@ async function startServer() {
       }
     });
   } else {
-    // When running bundled server from dist/server.cjs, __dirname is already dist/
+    // When running bundled server from dist/server.cjs, appDirname is already dist/
     // We check if we are inside dist or one level above
     const currentDir = process.cwd();
     let distPath = path.resolve(currentDir, "dist");
     
     // If we're executing from within the dist folder already
-    if (__dirname.endsWith('dist') || fs.existsSync(path.join(__dirname, 'index.html'))) {
-      distPath = __dirname;
+    if (appDirname.endsWith('dist') || fs.existsSync(path.join(appDirname, 'index.html'))) {
+      distPath = appDirname;
     }
     
     const indexPath = path.join(distPath, "index.html");
     
     console.log("Starting in PRODUCTION mode");
     console.log(`[DEBUG] Current Dir: ${currentDir}`);
-    console.log(`[DEBUG] __dirname: ${__dirname}`);
+    console.log(`[DEBUG] appDirname: ${appDirname}`);
     console.log(`[DEBUG] Static files target: ${distPath}`);
     console.log(`[DEBUG] Index HTML target: ${indexPath}`);
 
