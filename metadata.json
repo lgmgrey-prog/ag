@@ -1,5 +1,6 @@
 {
   "name": "Агрегатор",
   "description": "Агрегатор закупочных цен для HoReCa. Экономия до 5% на закупках, анализ прайсов и прямой мессенджер.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
