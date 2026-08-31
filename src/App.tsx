@@ -6844,7 +6844,7 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
     setIsVerifying(true);
     const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
     const body = mode === 'register' 
-      ? { inn, name: orgName, type, email }
+      ? { inn, name: orgName, type, email, password }
       : { inn, password };
 
     try {
@@ -6898,7 +6898,9 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
             ? 'Введите ИНН и пароль для входа в систему' 
             : verificationStep === 'confirm' 
               ? 'Пожалуйста, подтвердите вашу организацию'
-              : 'Заполните данные для создания аккаунта. Пароль придет на почту.'}
+              : verificationStep === 'form'
+                ? 'Укажите email и придумайте пароль для входа'
+                : 'Заполните данные для создания аккаунта'}
         </p>
         
         {error && (
@@ -7019,16 +7021,43 @@ const AuthModal = ({ isOpen, onClose, onAuth }: { isOpen: boolean, onClose: () =
               </div>
             ) : (
               verificationStep === 'form' && (
-                <div>
-                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Email для пароля</label>
-                  <input 
-                    type="email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="example@mail.com" 
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                    required
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Email</label>
+                    <input 
+                      type="email" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="example@mail.com" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Придумайте пароль</label>
+                    <div className="relative">
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Минимум 4 символа" 
+                        minLength={4}
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all pr-12"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                      >
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1.5">
+                      С этим паролем и вашим ИНН вы сможете входить в личный кабинет.
+                    </p>
+                  </div>
                 </div>
               )
             )}

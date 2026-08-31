@@ -1086,13 +1086,19 @@ async function startServer() {
   // Auth / Registration
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { inn, name, type, email } = req.body;
+      const { inn, name, type, email, password: customPassword } = req.body;
       
       if (!inn || !name || !type || !email) {
         return res.status(400).json({ error: "Все поля обязательны для заполнения" });
       }
 
-      const password = Math.random().toString(36).slice(-8); // Generate random 8-char password
+      const password = (customPassword && String(customPassword).trim()) 
+        ? String(customPassword).trim() 
+        : Math.random().toString(36).slice(-8);
+
+      if (password.length < 4) {
+        return res.status(400).json({ error: "Пароль должен быть не менее 4 символов" });
+      }
       
       try {
         const info = db.prepare("INSERT INTO users (inn, name, type, email, password, settings) VALUES (?, ?, ?, ?, ?, ?)").run(inn, name, type, email, password, JSON.stringify({}));
