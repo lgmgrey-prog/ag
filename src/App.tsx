@@ -48,7 +48,10 @@ import {
   Shield,
   ShieldCheck,
   FileClock,
-  CalendarRange
+  CalendarRange,
+  Clock,
+  Sparkles,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, PriceRecord, Recommendation, CartItem, Supplier, SupplierDetail, Notification } from './types';
@@ -155,17 +158,35 @@ const Navbar = ({ user, onLogout, onOpenAuth, onOpenSettings, onOpenFeedback, on
               </button>
             )}
             <button onClick={() => {
-              window.location.hash = '#promotions';
+              window.location.hash = '#restaurants';
               onShowLanding?.();
-            }} className="hover:text-emerald-600 transition-colors">Акции</button>
+              const el = document.getElementById('restaurants');
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }} className="hover:text-emerald-600 transition-colors">Ресторанам</button>
             <button onClick={() => {
               window.location.hash = '#suppliers';
               onShowLanding?.();
-            }} className="hover:text-emerald-600 transition-colors">Поставщики</button>
+              const el = document.getElementById('suppliers');
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }} className="hover:text-emerald-600 transition-colors">Поставщикам</button>
+            <button onClick={() => {
+              window.location.hash = '#promotions';
+              onShowLanding?.();
+              const el = document.getElementById('promotions');
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }} className="hover:text-emerald-600 transition-colors">Акции</button>
             <button onClick={() => {
               window.location.hash = '#about';
               onShowLanding?.();
-            }} className="hover:text-emerald-600 transition-colors">О проекте</button>
+              const el = document.getElementById('about');
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }} className="hover:text-emerald-600 transition-colors">О сервисе</button>
+            <button onClick={() => {
+              window.location.hash = '#pricing';
+              onShowLanding?.();
+              const el = document.getElementById('pricing');
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }} className="hover:text-emerald-600 transition-colors">Тарифы</button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
@@ -641,7 +662,7 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
             animate={{ opacity: 1, y: 0 }}
             className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold uppercase tracking-wider mb-6"
           >
-            <Zap size={14} /> Экономия до 5% на закупках
+            <Zap size={14} /> Экономия от 20% на закупках
           </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
@@ -668,15 +689,17 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
           >
             <button 
               onClick={onStart}
-              className="w-full sm:w-auto bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 group"
+              className="w-full sm:w-auto bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 group cursor-pointer"
             >
               Начать экономить <ArrowRight className="group-hover:translate-x-1 transition-transform" />
             </button>
             <button 
               onClick={() => {
-                window.location.hash = '#about';
+                window.location.hash = '#suppliers';
+                const el = document.getElementById('suppliers');
+                el?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="w-full sm:w-auto bg-white text-zinc-900 border border-zinc-200 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-zinc-50 transition-all"
+              className="w-full sm:w-auto bg-white text-zinc-900 border border-zinc-200 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-zinc-50 transition-all cursor-pointer"
             >
               Для поставщиков
             </button>
@@ -693,6 +716,191 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
 
     {/* Promotions */}
     <LandingPromotions />
+
+    {/* Restaurants Section */}
+    <section id="restaurants" className="py-28 bg-white relative overflow-hidden border-b border-zinc-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4">
+            <Sparkles size={14} /> Ресторанам и шеф-поварам
+          </div>
+          <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 mb-6">
+            Все преимущества сервиса <br />
+            <span className="text-emerald-600">для вашего ресторана</span>
+          </h2>
+          <p className="text-lg text-zinc-600 leading-relaxed">
+            Автоматизируйте закупки, контролируйте фудкост и получайте лучшие условия от всех проверенных поставщиков вашего региона в одном окне.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+          {/* Benefit 1 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.05 }}
+            className="p-8 rounded-[2.5rem] bg-zinc-50 border border-zinc-100 hover:border-emerald-200 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
+                <Clock size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">
+                Сравните цены у всех поставщиков региона за 10 секунд
+              </h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Мгновенный поиск выгодных цен по всей товарной матрице и прайс-листам поставщиков вашего города без ручного обзвона и бесконечных таблиц.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-zinc-200/60 text-xs font-bold text-emerald-600 uppercase tracking-wider">
+              Экономия времени
+            </div>
+          </motion.div>
+
+          {/* Benefit 2 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="p-8 rounded-[2.5rem] bg-zinc-50 border border-zinc-100 hover:border-emerald-200 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
+                <ShieldCheck size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">
+                Никаких откатов — все прозрачно и честно
+              </h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Прямой доступ к реальным рыночным ценам без посредников, скрытых наценок и сомнительных схем. Полный аудит закупок для владельца.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-zinc-200/60 text-xs font-bold text-blue-600 uppercase tracking-wider">
+              100% прозрачность
+            </div>
+          </motion.div>
+
+          {/* Benefit 3 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.15 }}
+            className="p-8 rounded-[2.5rem] bg-zinc-50 border border-zinc-100 hover:border-emerald-200 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
+                <CalendarRange size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">
+                Календарь сезонности — подскажем что, где и когда покупать
+              </h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Умный календарь подсказывает сезонный пик свежести и минимальных цен на овощи, фрукты, мясо, птицу и рыбу для снижения себестоимости меню.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-zinc-200/60 text-xs font-bold text-amber-600 uppercase tracking-wider">
+              Сезонная выгода
+            </div>
+          </motion.div>
+
+          {/* Benefit 4 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+            className="p-8 rounded-[2.5rem] bg-zinc-50 border border-zinc-100 hover:border-emerald-200 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
+                <TrendingUp size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">
+                Уведомления о повышении цен
+              </h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Мгновенные push- и email-оповещения об изменении стоимости позиций в вашей регулярной матрице до момента оформления и оплаты счета.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-zinc-200/60 text-xs font-bold text-rose-600 uppercase tracking-wider">
+              Контроль фудкоста
+            </div>
+          </motion.div>
+
+          {/* Benefit 5 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.25 }}
+            className="p-8 rounded-[2.5rem] bg-zinc-50 border border-zinc-100 hover:border-emerald-200 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-14 h-14 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
+                <Bell size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">
+                Уведомления о времени подачи заявки
+              </h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Блюда больше не попадут в стоп-лист: система напомнит о дедлайнах поставщиков для гарантированной своевременной поставки на кухню.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-zinc-200/60 text-xs font-bold text-purple-600 uppercase tracking-wider">
+              Без стоп-листов
+            </div>
+          </motion.div>
+
+          {/* Benefit 6 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.3 }}
+            className="p-8 rounded-[2.5rem] bg-zinc-50 border border-zinc-100 hover:border-emerald-200 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-14 h-14 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
+                <Send size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">
+                Авторассылка заявки в один клик
+              </h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Формируйте сводный заказ и отправляйте его всем выбранным поставщикам одновременно в один клик без ручного дублирования в разные чаты.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-zinc-200/60 text-xs font-bold text-teal-600 uppercase tracking-wider">
+              Автоматизация
+            </div>
+          </motion.div>
+        </div>
+
+        {/* CTA Banner */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.98 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-[3rem] p-10 md:p-14 text-white shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8"
+        >
+          <div className="max-w-xl">
+            <h3 className="text-3xl md:text-4xl font-bold mb-3">Готовы экономить от 20% на закупках?</h3>
+            <p className="text-emerald-100 text-base leading-relaxed">
+              Зарегистрируйте ваше заведение за 1 минуту, загрузите накладную и начните получать лучшие цены региона уже сегодня.
+            </p>
+          </div>
+          <button 
+            onClick={onStart}
+            className="shrink-0 bg-white text-emerald-800 px-10 py-5 rounded-2xl font-bold text-lg hover:bg-emerald-50 transition-all shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 flex items-center gap-3 cursor-pointer"
+          >
+            Зарегистрироваться <ArrowRight size={20} />
+          </button>
+        </motion.div>
+      </div>
+    </section>
 
     {/* Stats */}
     <section className="py-20 bg-zinc-50">
@@ -714,7 +922,7 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
       </div>
     </section>
 
-    {/* About & Mission Section - Redesigned for elegance */}
+    {/* About Section */}
     <section id="about" className="py-32 bg-white overflow-hidden relative">
       {/* Subtle background pattern */}
       <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none">
@@ -732,29 +940,19 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
               viewport={{ once: true }}
               className="relative"
             >
-              <div className="aspect-[4/5] rounded-[3rem] overflow-hidden shadow-2xl relative z-10">
+              <div className="aspect-[4/3] rounded-[3rem] overflow-hidden shadow-2xl relative z-10 border border-zinc-100 bg-zinc-100">
                 <img 
-                  src="https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&q=80&w=800&h=1000" 
-                  alt="Restaurant interior" 
+                  src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&q=80&w=1000" 
+                  alt="О сервисе RestCost" 
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                <div className="absolute bottom-6 left-8 text-white z-20">
+                  <p className="text-xs font-bold uppercase tracking-widest text-emerald-300 mb-1">RestCost Platform</p>
+                  <p className="text-lg font-bold">Экосистема умных закупок HoReCa</p>
+                </div>
               </div>
-              
-              {/* Floating Mission Card */}
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 }}
-                viewport={{ once: true }}
-                className="absolute -bottom-10 -right-6 md:-right-12 z-20 bg-emerald-600 text-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl max-w-xs md:max-w-sm"
-              >
-                <p className="text-xs font-bold uppercase tracking-[0.2em] mb-4 opacity-80">Наша миссия</p>
-                <h3 className="text-xl md:text-2xl font-bold italic leading-tight">
-                  «Улучшать и совершенствовать работу предприятий питания»
-                </h3>
-              </motion.div>
 
               {/* Decorative shapes */}
               <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-100 rounded-full blur-3xl -z-10 opacity-60"></div>
@@ -782,16 +980,19 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
 
               <div className="space-y-6 text-lg md:text-xl text-zinc-600 leading-relaxed">
                 <p>
-                  Ресткост - это сервис для сравнения цен на товары поставщиков horeca в вашем городе. Ресторанам помогаем сэкономить бюджет на закуп, а поставщикам найти новых клиентов. На сайте собрана полная база поставщиков вашего города/региона, что позволяет отслеживать все актуальные предложения поставщиков, контролировать увеличение цен и быть в курсе сезонных предложений.
+                  Ресткост — это сервис для сравнения цен на товары поставщиков HoReCa в вашем городе. Ресторанам помогаем сэкономить бюджет на закуп, а поставщикам — найти новых надежных клиентов.
+                </p>
+                <p className="text-base text-zinc-500">
+                  На сайте собрана полная база поставщиков вашего города и региона, что позволяет отслеживать все актуальные предложения, контролировать изменение цен и всегда быть в курсе сезонных скидок.
                 </p>
                 
-                <div className="pt-6">
+                <div className="pt-2">
                   <div className="flex items-start gap-4 p-6 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
                     <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center shrink-0 text-emerald-600">
                       <MessageSquare size={24} />
                     </div>
                     <p className="text-sm font-medium text-zinc-800 leading-relaxed">
-                      Сервис позволяет избавиться от огромного количества чатов в мессенджерах и объединить их в вашем личном кабинете.
+                      Сервис позволяет избавиться от огромного количества хаотичных чатов в мессенджерах и объединить все заказы и документы в вашем личном кабинете.
                     </p>
                   </div>
                 </div>
@@ -957,7 +1158,7 @@ const Landing = ({ onStart, onPayment }: { onStart: () => void, onPayment: (plan
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-zinc-900 mb-8 tracking-tight">Станьте частью крупнейшей сети</h2>
             <p className="text-lg text-zinc-600 mb-8 leading-relaxed">
-              RestCost — это не просто агрегатор, это мост между вашим складом и кухней лучшего ресторана. Мы предоставляем инструменты для прямой коммуникации, автоматического выставления счетов и аналитики спроса.
+              RestCost — это не просто агрегатор, это мост между вашим складом и кухней ресторана. Мы предоставляем инструменты для прямой коммуникации, автоматического выставления счетов и аналитики спроса.
             </p>
             <div className="space-y-4">
               {[
@@ -7054,59 +7255,151 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-zinc-100 py-16 bg-zinc-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-            <div className="col-span-1 md:col-span-1">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-8 h-8 bg-emerald-600 rounded flex items-center justify-center text-white font-bold text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+            {/* 1. Brand */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-md shadow-emerald-600/20">
                   <Package size={20} />
                 </div>
                 <span className="font-bold tracking-tight text-xl text-zinc-900">RestCost</span>
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Интеллектуальный помощник для управления закупками в ресторанном бизнесе. Экономим до 20% ваших расходов.
+                Интеллектуальный агрегатор и управление закупками для ресторанов и поставщиков HoReCa. Экономия от 20% бюджета заведений.
               </p>
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-100">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Мониторинг цен 24/7
+              </div>
             </div>
             
-            <div className="col-span-1">
-              <h4 className="font-bold text-zinc-900 mb-6">Сервис</h4>
-              <ul className="space-y-4 text-sm text-zinc-500">
-                <li><button onClick={() => {
-                  window.location.hash = '#about';
-                }} className="hover:text-emerald-600 transition-colors">О проекте</button></li>
-                <li><button onClick={() => {
-                  window.location.hash = '#pricing';
-                }} className="hover:text-emerald-600 transition-colors">Тарифы</button></li>
-                <li><button onClick={() => setIsFeedbackOpen(true)} className="hover:text-emerald-600 transition-colors">Поддержка</button></li>
+            {/* 2. Service Navigation */}
+            <div>
+              <h4 className="font-bold text-zinc-900 mb-5 text-sm uppercase tracking-wider">Сервис</h4>
+              <ul className="space-y-3 text-sm text-zinc-600">
+                <li>
+                  <button onClick={() => {
+                    setShowLanding(true);
+                    window.location.hash = '#restaurants';
+                    const el = document.getElementById('restaurants');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }} className="hover:text-emerald-600 transition-colors text-left">
+                    Ресторанам
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => {
+                    setShowLanding(true);
+                    window.location.hash = '#suppliers';
+                    const el = document.getElementById('suppliers');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }} className="hover:text-emerald-600 transition-colors text-left">
+                    Поставщикам
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => {
+                    setShowLanding(true);
+                    window.location.hash = '#promotions';
+                    const el = document.getElementById('promotions');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }} className="hover:text-emerald-600 transition-colors text-left">
+                    Актуальные акции
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => {
+                    setShowLanding(true);
+                    window.location.hash = '#about';
+                    const el = document.getElementById('about');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }} className="hover:text-emerald-600 transition-colors text-left">
+                    О сервисе
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => {
+                    setShowLanding(true);
+                    window.location.hash = '#pricing';
+                    const el = document.getElementById('pricing');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }} className="hover:text-emerald-600 transition-colors text-left">
+                    Тарифы
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setIsFeedbackOpen(true)} className="hover:text-emerald-600 transition-colors text-left">
+                    Обратная связь
+                  </button>
+                </li>
               </ul>
             </div>
 
-            <div className="col-span-1">
-              <h4 className="font-bold text-zinc-900 mb-6">Правовая информация</h4>
-              <ul className="space-y-4 text-sm text-zinc-500">
+            {/* 3. Legal Documents */}
+            <div>
+              <h4 className="font-bold text-zinc-900 mb-5 text-sm uppercase tracking-wider">Правовая информация</h4>
+              <ul className="space-y-3 text-sm text-zinc-600">
                 <li><button onClick={() => setLegalModal({ isOpen: true, key: 'public_offer' })} className="hover:text-emerald-600 transition-colors text-left">Публичная оферта</button></li>
                 <li><button onClick={() => setLegalModal({ isOpen: true, key: 'privacy_policy' })} className="hover:text-emerald-600 transition-colors text-left">Конфиденциальность</button></li>
                 <li><button onClick={() => setLegalModal({ isOpen: true, key: 'order_rules' })} className="hover:text-emerald-600 transition-colors text-left">Оплата и заказ</button></li>
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'payment_terms' })} className="hover:text-emerald-600 transition-colors text-left">Условия оплаты</button></li>
                 <li><button onClick={() => setLegalModal({ isOpen: true, key: 'refund_policy' })} className="hover:text-emerald-600 transition-colors text-left">Возврат и отмена</button></li>
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'delivery_terms' })} className="hover:text-emerald-600 transition-colors text-left">Условия доставки</button></li>
+                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'requisites' })} className="hover:text-emerald-600 transition-colors text-left">Реквизиты</button></li>
               </ul>
             </div>
 
-            <div className="col-span-1">
-              <h4 className="font-bold text-zinc-900 mb-6">Помощь</h4>
-              <ul className="space-y-4 text-sm text-zinc-500">
-                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'contacts' })} className="hover:text-emerald-600 transition-colors text-left">Контакты</button></li>
-                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'requisites' })} className="hover:text-emerald-600 transition-colors text-left">Реквизиты</button></li>
-                <li><button onClick={() => setLegalModal({ isOpen: true, key: 'delivery_terms' })} className="hover:text-emerald-600 transition-colors text-left">Доставка</button></li>
-              </ul>
+            {/* 4. Contacts & Telegram */}
+            <div>
+              <h4 className="font-bold text-zinc-900 mb-5 text-sm uppercase tracking-wider">Контакты и поддержка</h4>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-zinc-400 mb-2 font-medium">Официальная связь в Telegram:</p>
+                  <a 
+                    href="https://t.me/restcost_support" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="inline-flex items-center gap-2.5 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold text-xs transition-all border border-blue-200/80 group shadow-sm"
+                  >
+                    <Send size={15} className="text-blue-600" />
+                    <span>@restcost_support</span>
+                    <ExternalLink size={13} className="text-blue-500 opacity-70 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  </a>
+                </div>
+
+                <div className="space-y-2 pt-1 text-xs text-zinc-600">
+                  <div className="flex items-center gap-2">
+                    <Mail size={14} className="text-emerald-600 shrink-0" />
+                    <a href="mailto:support@restcost.ru" className="hover:text-emerald-600 transition-colors font-medium">
+                      support@restcost.ru
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock size={14} className="text-emerald-600 shrink-0" />
+                    <span>Ежедневно: 08:00 – 22:00 МСК</span>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button 
+                    onClick={() => setIsFeedbackOpen(true)}
+                    className="w-full py-2.5 px-4 bg-zinc-900 text-white rounded-xl font-bold text-xs hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                  >
+                    <MessageSquare size={14} />
+                    Написать в поддержку
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
           
           <div className="pt-8 border-t border-zinc-200 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex flex-col gap-1">
-              <p className="text-xs text-zinc-400">© 2026 RestCost App. Интеллектуальные закупки HoReCa. Все права защищены.</p>
-              <p className="text-[10px] text-zinc-300">Версия сборки: 2.4.0</p>
+            <div className="flex flex-col gap-1 text-center md:text-left">
+              <p className="text-xs text-zinc-500">© 2026 RestCost. Интеллектуальные закупки HoReCa. Все права защищены.</p>
+              <p className="text-[10px] text-zinc-400">Экосистема прямого взаимодействия ресторанов и поставщиков</p>
             </div>
             <div className="flex items-center gap-6">
-              <img src="https://robokassa.com/local/templates/robokassa/images/logo.svg" alt="Robokassa" className="h-6 grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all cursor-pointer" />
+              <img src="https://robokassa.com/local/templates/robokassa/images/logo.svg" alt="Robokassa" className="h-6 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all cursor-pointer" />
             </div>
           </div>
         </div>
